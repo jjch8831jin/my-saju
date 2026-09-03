@@ -1600,42 +1600,28 @@
     recog.lang='ko-KR';
     recog.continuous=true;
     recog.interimResults=true;
-    // 안드로이드 크롬 등 모바일 브라우저는 말이 잠깐 끊기면 자동으로 인식을 종료시키는 경우가 많음.
-    // wantListening: 사용자가 "듣기"를 원하는 상태(사용자가 직접 정지 누르기 전까지 true)
-    // sessionActive: 현재 대화(문장 뭉치) 시작 시점의 기존 텍스트를 한 번만 저장하기 위한 플래그
-    let baseText='', wantListening=false, sessionActive=false, restartTimer=null;
+    // wantListening: 사용자가 정지 버튼을 누르기 전까지 "듣기를 원하는 상태"인지 여부
+    // (모바일에서 발화가 끝나면 자동으로 다시 시작시키던 로직은 같은 말이 두 번 겹쳐 잡히는
+    //  문제를 일으켜 제거함 — 인식이 스스로 끝나면 그대로 종료하고, 필요하면 사용자가 다시 누른다)
+    let baseText='', wantListening=false;
     const finalizeUI=()=>{
+      wantListening=false;
       btn.classList.remove('recording'); btn.textContent='🎤'; btn.title='음성으로 입력';
     };
     recog.onstart=()=>{
       showErr('');
       btn.classList.add('recording'); btn.textContent='⏹'; btn.title='음성 입력 중지';
-      if(!sessionActive){
-        baseText = ta.value && !/\s$/.test(ta.value) ? ta.value+' ' : ta.value;
-        sessionActive = true;
-      }
+      baseText = ta.value && !/\s$/.test(ta.value) ? ta.value+' ' : ta.value;
     };
     recog.onerror=(e)=>{
       console.error('speech recognition error:', e.error);
       if(e.error==='no-speech' || e.error==='aborted'){
-        // 모바일에서 흔히 발생 — onend에서 자동 재시작을 시도하므로 별도 안내는 생략
-        return;
+        return; // onend에서 바로 마무리 처리됨
       }
-      wantListening=false; sessionActive=false;
       showErr(micErrorMessage(e.error));
     };
     recog.onend=()=>{
-      if(wantListening){
-        clearTimeout(restartTimer);
-        restartTimer=setTimeout(()=>{
-          if(!wantListening) return;
-          try{ recog.start(); }
-          catch(err){ wantListening=false; sessionActive=false; finalizeUI(); }
-        }, 200);
-      } else {
-        sessionActive=false;
-        finalizeUI();
-      }
+      finalizeUI();
     };
     recog.onresult=(e)=>{
       let interim='', final='';
@@ -1650,7 +1636,6 @@
     btn.addEventListener('click',()=>{
       if(wantListening){
         wantListening=false;
-        clearTimeout(restartTimer);
         recog.stop();
       } else {
         showErr('');
