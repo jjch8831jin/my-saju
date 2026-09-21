@@ -1319,7 +1319,9 @@
 
   // ---- AI 호출 ----
   function sleep(ms){ return new Promise(r=>setTimeout(r,ms)); }
-  const GEMINI_MODEL='gemini-2.5-flash';
+  // 새로 만든 키는 gemini-2.5-flash를 더 이상 쓸 수 없다고 안내가 와서, 새 모델을 먼저 쓰고 안 되면 예전 모델로 넘어간다.
+  const GEMINI_MODELS=['gemini-3.6-flash','gemini-2.5-flash'];
+  const MODEL_STORAGE_NAME='saju_gemini_model';   // 마지막으로 잘 됐던 모델을 기억
   const KEY_STORAGE_NAME='saju_gemini_api_key';           // (예전 방식: 키 1개) — 목록으로 옮기는 데만 쓴다
   const KEYS_STORAGE_NAME='saju_gemini_api_keys';        // 키 목록 [{id, key}]
   const ACTIVE_KEY_STORAGE_NAME='saju_gemini_active_key_id';
@@ -1373,10 +1375,21 @@
     return st===429 || st===403 || m.includes('quota') || m.includes('resource_exhausted') || m.includes('rate limit')
       || (st===400 && (m.includes('api key') || m.includes('api_key')));
   }
-  async function callClaudeOnce(promptText, keyArg){
+  function orderedModels(){
+    let pref=''; try{ pref=localStorage.getItem(MODEL_STORAGE_NAME)||''; }catch(e){}
+    const list=GEMINI_MODELS.slice();
+    if(pref && list.indexOf(pref)>0){ list.splice(list.indexOf(pref),1); list.unshift(pref); }
+    return list;
+  }
+  // 모델 자체의 문제(더 이상 못 쓰는 모델·없는 모델)인지
+  function isModelError(e){
+    const m=String((e&&e.message)||'').toLowerCase();
+    return (e&&e.status===404) || m.includes('no longer available') || m.includes('is not found') || m.includes('not supported for generatecontent') || m.includes('update your code to use models');
+  }
+  async function callClaudeOnce(promptText, keyArg, modelArg){
     const key = String(keyArg||'').trim();
     if(!key){ const e=new Error('Gemini API 키를 먼저 아래의 API 키 설정에서 추가해주세요.'); e.status=400; throw e; }
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${encodeURIComponent(key)}`;
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelArg||orderedModels()[0]}:generateContent?key=${encodeURIComponent(key)}`;
     const resp = await fetch(url, {
       method:'POST', headers:{'Content-Type':'application/json'},
       body: JSON.stringify({ contents:[{parts:[{text:promptText}]}] })
@@ -1394,12 +1407,30 @@
     const text = parts ? parts.map(p=>p.text||'').join('') : '';
     return text.trim();
   }
+  // 한 키로, 모델을 차례로 써 본다: 모델이 막혀 있거나(새 키는 2.5를 못 씀) 그 모델의 한도가 0이면 다음 모델로
+  async function callWithModels(promptText, key){
+    const models=orderedModels();
+    let lastErr;
+    for(let i=0;i<models.length;i++){
+      try{
+        const text=await callClaudeOnce(promptText, key, models[i]);
+        try{ localStorage.setItem(MODEL_STORAGE_NAME, models[i]); }catch(e){}
+        return text;
+      } catch(e){
+        lastErr=e;
+        const moreModels=i<models.length-1;
+        if(moreModels && (isModelError(e) || e.status===429)) continue;
+        throw e;
+      }
+    }
+    throw lastErr;
+  }
   // 한 키로 호출: 일시적 오류(5xx)는 잠깐 대기 후 재시도
   async function callWithKey(finalPrompt, key, retries){
     let lastErr;
     for(let attempt=0; attempt<=retries; attempt++){
       try{
-        return await callClaudeOnce(finalPrompt, key);
+        return await callWithModels(finalPrompt, key);
       } catch(e){
         lastErr = e;
         const transient = e.status && e.status>=500;
@@ -1701,7 +1732,7 @@
   function showKeyOk(text){ keyTestSuccess.textContent=text; keyTestSuccess.style.display='block'; }
   async function testOneKey(key){
     resetKeyMsgs(); keyTestLoading.classList.add('show');
-    try{ await callClaudeOnce('안녕', key); showKeyOk('✓ 이 키는 정상이에요.'); }
+    try{ await callWithModels('안녕', key); showKeyOk('✓ 이 키는 정상이에요.'); }
     catch(e){ showKeyError('키 확인 실패: ' + e.message); }
     finally{ keyTestLoading.classList.remove('show'); }
   }
@@ -1762,7 +1793,7 @@
     keySaveBtn.disabled=true;
     let addIt=false, note='';
     try{
-      await callClaudeOnce('안녕', v);
+      await callWithModels('안녕', v);
       addIt=true; note='✓ 키가 정상적으로 확인되어 추가했어요.';
     } catch(e){
       const m=String(e.message||'').toLowerCase();
