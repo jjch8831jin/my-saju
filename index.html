@@ -270,6 +270,9 @@
       <div class="field"><label class="keep-size" style="font-size:12pt;">시</label><select id="selHour"></select></div>
       <div class="field"><label class="keep-size" style="font-size:12pt;">분</label><select id="selMinute"></select></div>
     </div>
+    <div class="row">
+      <div class="field"><label class="keep-size" style="font-size:12pt;">시(時) 바로 선택 — 정확한 시각을 모를 때 자시·축시·인시…로 고르세요</label><select id="selShi"></select></div>
+    </div>
     <label class="unknown-time keep-size"><input type="checkbox" id="chkUnknown"> 태어난 시간을 모릅니다 (시주·십이운성 일부 제외)</label>
     <label class="unknown-time keep-size"><input type="checkbox" id="chkTrueSolar" checked> 진태양시 보정 적용 (동경 127.5° 기준, 시계 시각에서 -30분 · 대부분의 만세력 사이트 기본값)</label>
     <p class="note keep-size" id="noteText">양력 기준으로 계산합니다. 실제 출생지의 진태양시(경도 보정)는 적용하지 않으며, 한국 표준시(UTC+9) 기준입니다.</p>
@@ -1534,10 +1537,59 @@
     noteText.textContent='음력 날짜는 신월(삭) 계산으로 양력으로 환산한 뒤 사주를 구합니다. 윤달이면 옆의 "윤달" 버튼을 눌러주세요.';
     fillDays();
   });
+  // ---- 시(時) 바로 선택: 자시·축시·인시… 로 고르기 ----
+  // 고르면 그 시(時)의 한가운데 시각을 시·분 칸에 자동으로 넣어서, 나머지 계산은 그대로 쓴다.
+  // 표시하는 시각 범위는 "진태양시 보정" 체크 여부에 따라 30분씩 달라진다.
+  const selShi=document.getElementById('selShi');
+  const SHI_NAMES=['자','축','인','묘','진','사','오','미','신','유','술','해'];
+  const SHI_HANJA=['子','丑','寅','卯','辰','巳','午','未','申','酉','戌','亥'];
+  function fmtHM(totalMin){
+    totalMin=((totalMin%1440)+1440)%1440;
+    return String(Math.floor(totalMin/60)).padStart(2,'0')+':'+String(totalMin%60).padStart(2,'0');
+  }
+  function shiLabelOf(v){
+    if(v==='ja-dawn') return '자시(子時·새벽)';
+    if(v==='ja-night') return '자시(子時·밤)';
+    const k=parseInt(v,10);
+    return isNaN(k)?'':`${SHI_NAMES[k]}시(${SHI_HANJA[k]}時)`;
+  }
+  function buildShiOptions(){
+    const shift=document.getElementById('chkTrueSolar').checked?30:0;
+    const prev=selShi.value;
+    const items=[['','직접 입력 (위의 시·분 사용)']];
+    items.push(['ja-dawn',`자시(子時) 새벽 ${fmtHM(0)}~${fmtHM(60+shift-1)}`]);
+    for(let k=1;k<=11;k++) items.push([String(k),`${SHI_NAMES[k]}시(${SHI_HANJA[k]}時) ${fmtHM((2*k-1)*60+shift)}~${fmtHM((2*k+1)*60+shift-1)}`]);
+    items.push(['ja-night',`자시(子時) 밤 ${fmtHM(23*60+shift)}~23:59 (일주는 다음 날 기준)`]);
+    selShi.innerHTML='';
+    items.forEach(([v,t])=>{ const o=document.createElement('option'); o.value=v; o.textContent=t; selShi.appendChild(o); });
+    selShi.value=prev;
+  }
+  function applyShiChoice(){
+    const v=selShi.value;
+    const unknown=chkUnknown.checked;
+    if(!v || unknown){
+      selHour.disabled=unknown; selMinute.disabled=unknown;
+      selHour.style.opacity=unknown?0.4:1; selMinute.style.opacity=unknown?0.4:1;
+      return;
+    }
+    const on=document.getElementById('chkTrueSolar').checked;
+    let h,m;
+    if(v==='ja-dawn'){ h=0; m=on?45:30; }
+    else if(v==='ja-night'){ h=23; m=on?45:30; }
+    else { h=2*parseInt(v,10); m=on?30:0; }
+    selHour.value=String(h); selMinute.value=String(m);
+    selHour.disabled=true; selMinute.disabled=true;
+    selHour.style.opacity=0.4; selMinute.style.opacity=0.4;
+  }
   chkUnknown.addEventListener('change',()=>{
-    const on=chkUnknown.checked; selHour.disabled=on; selMinute.disabled=on;
-    selHour.style.opacity=on?0.4:1; selMinute.style.opacity=on?0.4:1;
+    const on=chkUnknown.checked;
+    selShi.disabled=on; selShi.style.opacity=on?0.4:1;
+    if(on){ selShi.value=''; }
+    applyShiChoice();
   });
+  selShi.addEventListener('change',applyShiChoice);
+  document.getElementById('chkTrueSolar').addEventListener('change',()=>{ buildShiOptions(); applyShiChoice(); });
+  buildShiOptions();
 
   // ---- API 키 저장 UI ----
   const keyEnteredView=document.getElementById('keyEnteredView');
@@ -1757,16 +1809,18 @@
     }
     const hasTime=!chkUnknown.checked, hour=hasTime?+selHour.value:12, minute=hasTime?+selMinute.value:0;
     const applyTrueSolar=document.getElementById('chkTrueSolar').checked;
+    const shiChoice=hasTime?selShi.value:'';
+    const shiLabel=shiChoice?shiLabelOf(shiChoice):'';
     const s=computeSaju(year,month,day,hour,minute,hasTime,applyTrueSolar);
 
-    renderAll(s, {year, month, day, hour, minute, hasTime, isMale, convertedNote, applyTrueSolar, edited:false, name});
+    renderAll(s, {year, month, day, hour, minute, hasTime, isMale, convertedNote, applyTrueSolar, edited:false, name, shiLabel});
     exitEditMode();
 
     if(!suppressAutoSave){
       addRecord({
         id: Date.now()+'_'+Math.random().toString(36).slice(2,7),
         name, isMale, calType, inYear, inMonth, inDay, isLeapMonth,
-        hasTime, hour, minute, applyTrueSolar,
+        hasTime, hour, minute, applyTrueSolar, shiChoice,
         savedAt: new Date().toISOString()
       });
     }
@@ -1779,7 +1833,7 @@
 
   // ---- 계산 결과 렌더링 (최초 계산 및 수동 수정 적용 시 공용으로 사용) ----
   function renderAll(s, meta){
-    const {year, month, day, hour, minute, hasTime, isMale:im, convertedNote, applyTrueSolar, edited, name} = meta;
+    const {year, month, day, hour, minute, hasTime, isMale:im, convertedNote, applyTrueSolar, edited, name, shiLabel} = meta;
     const dayStemIdx=s.day.stem;
     selectedDwIdx=null; selectedSwYear=null;
 
@@ -1797,7 +1851,7 @@
     document.getElementById('legend').innerHTML = ELEM_ORDER.map(e=>`<div><span class="dot" style="background:${ELEM_COLOR[e]}"></span>${e} ${counts[e]}</div>`).join('');
     document.getElementById('resultTitle').textContent = name ? `${name}님의 사주원국` : '사주원국';
     document.getElementById('resultMeta').textContent =
-      `${year}년 ${month}월 ${day}일 ${hasTime? String(hour).padStart(2,'0')+':'+String(minute).padStart(2,'0') : '시간 미상'} · ${im?'남자':'여자'}${convertedNote||''}${hasTime?(applyTrueSolar?' · 진태양시 보정 적용':' · 보정 미적용(시계 시각 그대로)'):''}${edited?' · ✎ 직접 수정됨':''}`;
+      `${year}년 ${month}월 ${day}일 ${hasTime? (shiLabel? shiLabel : String(hour).padStart(2,'0')+':'+String(minute).padStart(2,'0')) : '시간 미상'} · ${im?'남자':'여자'}${convertedNote||''}${hasTime?(applyTrueSolar?' · 진태양시 보정 적용':' · 보정 미적용(시계 시각 그대로)'):''}${edited?' · ✎ 직접 수정됨':''}`;
 
     // 신강/신약 + 용신 (위치별 가중치 + 통근 반영)
     const dayElem=STEM_ELEM[dayStemIdx];
@@ -1849,7 +1903,7 @@
     }
     document.getElementById('swList').innerHTML = swRows;
 
-    state = {s, dayStemIdx, counts, total, year, month, day, hour, minute, hasTime, isMale:im, strength, ys, dayElem, applyTrueSolar, dw, name};
+    state = {s, dayStemIdx, counts, total, year, month, day, hour, minute, hasTime, isMale:im, strength, ys, dayElem, applyTrueSolar, dw, name, shiLabel};
     qnaHistory = [];
     renderPillarsRow();
     renderRelPanel();
@@ -1918,7 +1972,7 @@
     renderAll(newS, {
       year: state.year, month: state.month, day: state.day, hour: state.hour, minute: state.minute,
       hasTime: state.hasTime, isMale: state.isMale, convertedNote: ' (수동 수정됨)',
-      applyTrueSolar: state.applyTrueSolar, edited: true, name: state.name
+      applyTrueSolar: state.applyTrueSolar, edited: true, name: state.name, shiLabel: state.shiLabel
     });
     exitEditMode();
   });
@@ -2010,7 +2064,7 @@
     body.innerHTML = '<div class="date-list">' + list.map(rec=>{
       const label = rec.name ? rec.name : '(이름 없음)';
       const calLabel = rec.calType==='lunar' ? `음력${rec.isLeapMonth?'(윤)':''}` : '양력';
-      const timeLabel = rec.hasTime ? `${String(rec.hour).padStart(2,'0')}:${String(rec.minute).padStart(2,'0')}` : '시간미상';
+      const timeLabel = rec.hasTime ? (rec.shiChoice ? shiLabelOf(rec.shiChoice) : `${String(rec.hour).padStart(2,'0')}:${String(rec.minute).padStart(2,'0')}`) : '시간미상';
       return `<div class="date-item" style="cursor:pointer;" data-recid="${rec.id}">
         <span><b>${escapeHtml(label)}</b> · ${rec.isMale?'남':'여'} · ${calLabel} ${rec.inYear}.${rec.inMonth}.${rec.inDay} ${timeLabel}<br><span style="font-size:11px;color:var(--ink-soft);">${formatSavedAt(rec.savedAt)}</span></span>
         <span class="dtag" data-delid="${rec.id}" style="color:var(--seal);cursor:pointer;">삭제</span>
@@ -2044,6 +2098,10 @@
     selHour.style.opacity = rec.hasTime?1:0.4; selMinute.style.opacity = rec.hasTime?1:0.4;
     if(rec.hasTime){ selHour.value = rec.hour; selMinute.value = rec.minute; }
     document.getElementById('chkTrueSolar').checked = rec.applyTrueSolar!==false;
+    selShi.disabled = !rec.hasTime; selShi.style.opacity = rec.hasTime?1:0.4;
+    buildShiOptions();
+    selShi.value = (rec.hasTime && rec.shiChoice) ? rec.shiChoice : '';
+    applyShiChoice();
     closeModal();
     suppressAutoSave = true;
     document.getElementById('btnGo').click();
