@@ -269,9 +269,7 @@
     <div class="row">
       <div class="field"><label class="keep-size" style="font-size:12pt;">시</label><select id="selHour"></select></div>
       <div class="field"><label class="keep-size" style="font-size:12pt;">분</label><select id="selMinute"></select></div>
-    </div>
-    <div class="row">
-      <div class="field"><label class="keep-size" style="font-size:12pt;">시(時) 바로 선택 — 정확한 시각을 모를 때 자시·축시·인시…로 고르세요</label><select id="selShi"></select></div>
+      <div class="field"><label class="keep-size" style="font-size:12pt;">시진(時辰)</label><select id="selShi"></select></div>
     </div>
     <label class="unknown-time keep-size"><input type="checkbox" id="chkUnknown"> 태어난 시간을 모릅니다 (시주·십이운성 일부 제외)</label>
     <label class="unknown-time keep-size"><input type="checkbox" id="chkTrueSolar" checked> 진태양시 보정 적용 (동경 127.5° 기준, 시계 시각에서 -30분 · 대부분의 만세력 사이트 기본값)</label>
@@ -291,22 +289,36 @@
     <button type="button" class="tab-btn" data-tab="qna">실시간 Q&amp;A</button>
   </div>
   <p class="note keep-size" id="introNote" style="margin-top:14px; font-size:10pt;">먼저 위에서 사주를 계산한 뒤, 위 버튼을 누르면 팝업창으로 해당 풀이를 볼 수 있어요.</p>
-  <div class="card" style="padding:14px 18px;">
-    <label class="keep-size" style="font-size:10pt;color:var(--ink-soft);display:block;margin-bottom:6px;">현재 상황 (선택 — 사주풀이·운세·궁합·실시간 Q&amp;A에 함께 반영돼요)</label>
-    <div class="voice-input-wrap">
-      <textarea id="ctxShared" rows="4" placeholder="예: 이직을 고민 중이다, 최근 다투는 일이 많다 등" style="width:100%; font-family:inherit; font-size:12pt; padding:9px 10px; border:1px solid var(--rule); border-radius:8px; background:#fffdf7; resize:vertical; min-height:96px;"></textarea>
-      <button type="button" class="mic-btn" id="micCtxShared" title="음성으로 입력">🎤</button>
+  <div class="fold-card" style="margin-bottom:12px;">
+    <div class="fold-head" style="display:flex; align-items:center; gap:10px; cursor:pointer; min-width:0; padding:13px; background:#3d7a5c; color:#ffffff; border:1px solid #2f6148; border-radius:8px; font-weight:700; letter-spacing:0.04em;">
+      <span class="fold-caret" style="flex:none; font-size:14pt;">▸</span>
+      <span style="flex:none; font-size:14pt; font-weight:700;">현재 상황</span>
+      <span class="fold-preview" style="flex:1; min-width:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; font-size:14pt; font-weight:400; opacity:0.9;"></span>
     </div>
-    <div class="mic-err" id="micErrCtxShared"></div>
+    <div class="fold-body" style="display:none; margin-top:6px; background:rgba(255,252,244,0.85); border:1px solid #3d7a5c; border-radius:10px; padding:12px 14px;">
+      <div class="keep-size" style="font-size:10pt; color:var(--ink-soft); margin-bottom:6px;">사주풀이·운세·궁합·실시간 Q&amp;A에 함께 반영돼요 · 빈 곳을 누르면 접혀요</div>
+      <div class="voice-input-wrap">
+        <textarea id="ctxShared" rows="4" placeholder="예: 이직을 고민 중이다, 최근 다투는 일이 많다 등" style="width:100%; font-family:inherit; font-size:14pt; padding:9px 10px; border:1px solid var(--rule); border-radius:8px; background:#fffdf7; resize:vertical; min-height:96px; max-height:40vh; overflow-y:auto;"></textarea>
+        <button type="button" class="mic-btn" id="micCtxShared" title="음성으로 입력">🎤</button>
+      </div>
+      <div class="mic-err" id="micErrCtxShared"></div>
+    </div>
   </div>
-  <div class="card" style="padding:14px 18px; margin-top:-12px;">
-    <label class="keep-size" style="font-size:10pt;color:var(--ink-soft);display:block;margin-bottom:6px;">AI 풀이 지침 (선택 — 사주풀이·운세·궁합·대운/세운·별자리·실시간 Q&amp;A 모든 AI 풀이가 이 지침을 지켜서 답해요)</label>
-    <div class="voice-input-wrap">
-      <textarea id="guideShared" rows="4" placeholder="예: 존댓말로 답해줘 / 결론부터 말해줘 / 불교 관점에서 풀이해줘 / 좋은 말만 하지 말고 주의할 점도 꼭 짚어줘 / 두루뭉술한 표현 금지" style="width:100%; font-family:inherit; font-size:12pt; padding:9px 10px; border:1px solid var(--rule); border-radius:8px; background:#fffdf7; resize:vertical; min-height:96px;"></textarea>
-      <button type="button" class="mic-btn" id="micGuideShared" title="음성으로 입력">🎤</button>
+  <div class="fold-card" style="margin-bottom:28px;">
+    <div class="fold-head" style="display:flex; align-items:center; gap:10px; cursor:pointer; min-width:0; padding:13px; background:#2b3a67; color:#ffffff; border:1px solid #202c50; border-radius:8px; font-weight:700; letter-spacing:0.04em;">
+      <span class="fold-caret" style="flex:none; font-size:14pt;">▸</span>
+      <span style="flex:none; font-size:14pt; font-weight:700;">AI 풀이 지침</span>
+      <span class="fold-preview" style="flex:1; min-width:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; font-size:14pt; font-weight:400; opacity:0.9;"></span>
     </div>
-    <div class="mic-err" id="micErrGuideShared"></div>
-    <div id="guideSavedNote" class="keep-size" style="font-size:10pt;color:var(--ink-soft);margin-top:6px;">입력하면 이 브라우저에 자동 저장되어 다음에 열어도 그대로 남아 있어요.</div>
+    <div class="fold-body" style="display:none; margin-top:6px; background:rgba(255,252,244,0.85); border:1px solid #2b3a67; border-radius:10px; padding:12px 14px;">
+      <div class="keep-size" style="font-size:10pt; color:var(--ink-soft); margin-bottom:6px;">사주풀이·운세·궁합·대운/세운·별자리·실시간 Q&amp;A 모든 AI 풀이가 이 지침을 지켜서 답해요 · 빈 곳을 누르면 접혀요</div>
+      <div class="voice-input-wrap">
+        <textarea id="guideShared" rows="4" placeholder="예: 존댓말로 답해줘 / 결론부터 말해줘 / 불교 관점에서 풀이해줘 / 좋은 말만 하지 말고 주의할 점도 꼭 짚어줘 / 두루뭉술한 표현 금지" style="width:100%; font-family:inherit; font-size:14pt; padding:9px 10px; border:1px solid var(--rule); border-radius:8px; background:#fffdf7; resize:vertical; min-height:96px; max-height:40vh; overflow-y:auto;"></textarea>
+        <button type="button" class="mic-btn" id="micGuideShared" title="음성으로 입력">🎤</button>
+      </div>
+      <div class="mic-err" id="micErrGuideShared"></div>
+      <div id="guideSavedNote" class="keep-size" style="font-size:10pt;color:var(--ink-soft);margin-top:6px;">입력하면 이 브라우저에 자동 저장되어 다음에 열어도 그대로 남아 있어요.</div>
+    </div>
   </div>
 
   <div id="result">
@@ -1456,6 +1468,22 @@
     const rels = [...detectStemRelations(stemListForRel), ...detectRelations(branchList)];
     lines.push('형충회합: ' + (rels.length? rels.map(r=>`${r.pair.join('-')} ${r.type}`).join(', ') : '두드러진 관계 없음'));
 
+    // ---- 대운·세운·월운이 원국과 만나는 합·충·형·해를 앱이 직접 계산해서 AI에 전달 ----
+    const ganji=(st,br)=>`${STEM_HANJA[st]}${BRANCH_HANJA[br]}(${STEMS[st]}${BRANCHES[br]})`;
+    const tgOf=(st,br)=>`천간 십신 ${tenGod(dayStemIdx, STEM_ELEM[st], st%2===0)}, 지지 십신 ${tenGod(dayStemIdx, BRANCH_ELEM[br], br%2===0)}, 십이운성 ${twelveStage(dayStemIdx, br)}`;
+    // layers: 원국 위에 얹어 볼 운(대운·세운·월운). targetKey가 들어간 관계만 골라낸다.
+    const relText=(layers, targetKey)=>{
+      const sl=[{idx:s.year.stem,label:'년간'},{idx:s.month.stem,label:'월간'},{idx:s.day.stem,label:'일간'}];
+      if(s.hour) sl.push({idx:s.hour.stem,label:'시간'});
+      const bl=[{idx:s.year.branch,label:'년지'},{idx:s.month.branch,label:'월지'},{idx:s.day.branch,label:'일지'}];
+      if(s.hour) bl.push({idx:s.hour.branch,label:'시지'});
+      layers.forEach(l=>{ sl.push({idx:l.stem,label:l.key+'간'}); bl.push({idx:l.branch,label:l.key+'지'}); });
+      const found=[...detectStemRelations(sl), ...detectRelations(bl)].filter(r=>r.pair.some(x=>x.indexOf(targetKey)===0));
+      return found.length ? found.map(r=>`${r.pair.join('-')} ${r.charName||r.type}(${r.type})`).join(', ') : '두드러진 합·충·형·해 없음';
+    };
+    const dwAll=(year && month && day) ? computeDaewoon(s, isMaleFlag, year, month, day) : null;
+    const dwForYear=(y)=>{ if(!dwAll||!year) return null; const a=y-year+1; return dwAll.list.find(it=>a>=it.ageFrom&&a<=it.ageTo)||null; };
+
     // 대운 (현재 나이대 + 앞으로 몇 단계)
     if(year && month && day){
       const dw = computeDaewoon(s, isMaleFlag, year, month, day);
@@ -1465,6 +1493,8 @@
       lines.push(`대운: ${dw.forward?'순행':'역행'}, 대운수 ${dw.daewoonSu}, 현재(만 나이 약 ${age-1}세 기준) 대운=${STEM_HANJA[cur.stem]}${BRANCH_HANJA[cur.branch]}(${cur.ageFrom}~${cur.ageTo}세)`);
       const upcoming = dw.list.filter(it=>it.ageFrom>=cur.ageFrom).slice(0,4);
       lines.push('앞으로의 대운 흐름: ' + upcoming.map(it=>`${STEM_HANJA[it.stem]}${BRANCH_HANJA[it.branch]}(${it.ageFrom}~${it.ageTo}세)`).join(' → '));
+      lines.push(`현재 대운 ${ganji(cur.stem,cur.branch)} — ${tgOf(cur.stem,cur.branch)}`);
+      lines.push(`  · 현재 대운이 원국과 만나는 관계: ${relText([{key:'대운',stem:cur.stem,branch:cur.branch}],'대운')}`);
     }
 
     // 오늘 날짜 + 올해/내년 세운 (AI가 지금이 몇 년인지 알 수 있도록)
@@ -1472,7 +1502,24 @@
     const _gz=(y)=>{ const i=mod(y-4,60), st=mod(i,10), br=mod(i,12);
       return `${STEM_HANJA[st]}${BRANCH_HANJA[br]}(${STEMS[st]}${BRANCHES[br]}년, 천간 십신 ${tenGod(dayStemIdx, STEM_ELEM[st], st%2===0)}, 지지 십신 ${tenGod(dayStemIdx, BRANCH_ELEM[br], br%2===0)})`; };
     lines.unshift(`[오늘 날짜] ${ny}년 ${nmo}월 ${nd}일 — 지금은 ${ny}년입니다. ${ny-1}년 이전은 이미 지나간 과거이며, '올해'는 ${ny}년, '내년'은 ${ny+1}년입니다.`);
-    lines.push(`올해(${ny}년) 세운: ${_gz(ny)}`, `내년(${ny+1}년) 세운: ${_gz(ny+1)}`);
+    const yearLine=(label,y)=>{
+      const i=mod(y-4,60), st=mod(i,10), br=mod(i,12);
+      const dwi=dwForYear(y);
+      const layers=[]; if(dwi) layers.push({key:'대운',stem:dwi.stem,branch:dwi.branch});
+      layers.push({key:'세운',stem:st,branch:br});
+      let out=`${label}(${y}년) 세운 ${ganji(st,br)} — ${tgOf(st,br)}`;
+      if(dwi) out+=` | 그해의 대운 ${ganji(dwi.stem,dwi.branch)}(${dwi.ageFrom}~${dwi.ageTo}세)`;
+      out+=`\n  · 세운이 원국·대운과 만나는 관계: ${relText(layers,'세운')}`;
+      return out;
+    };
+    const monthLine=(label,d)=>{
+      const ms=computeSaju(d.getFullYear(), d.getMonth()+1, d.getDate(), 12, 0, false, false).month;
+      return `${label} 월운 ${ganji(ms.stem,ms.branch)} — ${tgOf(ms.stem,ms.branch)}\n  · 월운이 원국과 만나는 관계: ${relText([{key:'월운',stem:ms.stem,branch:ms.branch}],'월운')}`;
+    };
+    const _next=new Date(ny, _now.getMonth()+1, 15);
+    lines.push(yearLine('올해',ny), yearLine('내년',ny+1));
+    lines.push(monthLine(`이번 달(${nmo}월)`,_now), monthLine(`다음 달(${_next.getMonth()+1}월)`,_next));
+    lines.push('[계산 안내] 위의 "만나는 관계"는 앱이 대운·세운·월운과 원국 글자를 직접 계산한 결과입니다. 합·충·형·해는 여기 적힌 것만 근거로 삼고, 목록에 없는 관계를 새로 지어내지 마세요.');
 
     return lines.join('\n');
   }
@@ -1556,10 +1603,10 @@
   function buildShiOptions(){
     const shift=document.getElementById('chkTrueSolar').checked?30:0;
     const prev=selShi.value;
-    const items=[['','직접 입력 (위의 시·분 사용)']];
-    items.push(['ja-dawn',`자시(子時) 새벽 ${fmtHM(0)}~${fmtHM(60+shift-1)}`]);
-    for(let k=1;k<=11;k++) items.push([String(k),`${SHI_NAMES[k]}시(${SHI_HANJA[k]}時) ${fmtHM((2*k-1)*60+shift)}~${fmtHM((2*k+1)*60+shift-1)}`]);
-    items.push(['ja-night',`자시(子時) 밤 ${fmtHM(23*60+shift)}~23:59 (일주는 다음 날 기준)`]);
+    const items=[['','시·분 입력']];
+    items.push(['ja-dawn',`자시 새벽 ${fmtHM(0)}~${fmtHM(60+shift-1)}`]);
+    for(let k=1;k<=11;k++) items.push([String(k),`${SHI_NAMES[k]}시 ${fmtHM((2*k-1)*60+shift)}~${fmtHM((2*k+1)*60+shift-1)}`]);
+    items.push(['ja-night',`자시 밤 ${fmtHM(23*60+shift)}~23:59 (다음 날 일주)`]);
     selShi.innerHTML='';
     items.forEach(([v,t])=>{ const o=document.createElement('option'); o.value=v; o.textContent=t; selShi.appendChild(o); });
     selShi.value=prev;
@@ -1696,7 +1743,19 @@
     const ta=document.getElementById(textareaId), btn=document.getElementById(btnId);
     const errBox = errId ? document.getElementById(errId) : null;
     if(!ta || !btn) return;
-    const showErr = (msg)=>{ if(errBox){ errBox.textContent = msg; errBox.classList.toggle('show', !!msg); } };
+    const showErr = (msg)=>{ if(errBox){ errBox.dataset.hint=''; errBox.textContent = msg; errBox.classList.toggle('show', !!msg); } };
+    // 허용 창이 문장마다 다시 뜨는 경우의 안내 (브라우저가 "이번에만 허용"으로만 기억하고 있을 때 생긴다)
+    let hintShown=false;
+    const maybeShowPermissionHint = ()=>{
+      if(hintShown || !errBox || !navigator.permissions || !navigator.permissions.query) return;
+      navigator.permissions.query({name:'microphone'}).then(st=>{
+        if(st.state==='granted') return;
+        hintShown=true;
+        errBox.dataset.hint='1';
+        errBox.textContent='🎤 마이크 허용 창이 계속 뜨면: 창에서 "이번에만 허용"이 아니라 "허용"을 누르고, 그래도 뜨면 크롬 ⋮ → 설정 → 사이트 설정 → 마이크에서 이 사이트를 "허용"으로 바꿔 주세요.';
+        errBox.classList.add('show');
+      }).catch(()=>{});
+    };
     const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
     if(!SR){
       btn.disabled=true;
@@ -1722,7 +1781,7 @@
       btn.classList.remove('recording'); btn.textContent='🎤'; btn.title='음성으로 입력';
     };
     recog.onstart=()=>{
-      showErr('');
+      if(!errBox || errBox.dataset.hint!=='1') showErr('');
       btn.classList.add('recording'); btn.textContent='⏹'; btn.title='음성 입력 중지';
       baseText = ta.value && !/\s$/.test(ta.value) ? ta.value+' ' : ta.value;
     };
@@ -1736,6 +1795,7 @@
     };
     recog.onend=()=>{
       if(wantListening){
+        maybeShowPermissionHint();
         try{ recog.start(); } // 다음 문장을 위해 즉시 재시작
         catch(err){ finalizeUI(); }
       } else {
@@ -1788,6 +1848,53 @@
     g.addEventListener('blur', persist);
     attachVoiceInput('guideShared','micGuideShared','micErrGuideShared');
     persist();
+  })();
+
+  // ---- 접었다 펴는 칸 (현재 상황 / AI 풀이 지침): 평소엔 한 줄 버튼처럼 작게, 누르면 펼쳐지고, 빈 곳을 누르면 다시 접힌다 ----
+  (function(){
+    const previewText=(ta)=>{
+      const v=(ta.value||'').trim();
+      if(!v) return '';
+      const lines=v.split(/\n+/).filter(x=>x.trim());
+      return (lines.length>1 ? lines.length+'줄 · ' : '') + lines[0];
+    };
+    const cards=Array.from(document.querySelectorAll('.fold-card'));
+    cards.forEach(card=>{
+      const head=card.querySelector('.fold-head'), body=card.querySelector('.fold-body');
+      const caret=card.querySelector('.fold-caret'), prev=card.querySelector('.fold-preview');
+      const ta=card.querySelector('textarea');
+      if(!head||!body||!caret||!prev||!ta) return;
+      const refresh=()=>{ prev.textContent=previewText(ta); };
+      const setOpen=(open)=>{
+        body.style.display=open?'block':'none';
+        caret.textContent=open?'▾':'▸';
+        prev.style.display=open?'none':'block';
+        if(open){
+          autoGrow(ta);
+          // 다른 칸이 열려 있으면 하나만 열리도록 접는다
+          cards.forEach(c=>{ if(c!==card && c._setOpen) c._setOpen(false); });
+        } else { refresh(); }
+      };
+      card._setOpen=setOpen;
+      card._isOpen=()=>body.style.display!=='none';
+      head.addEventListener('click',()=>setOpen(body.style.display==='none'));
+      ta.addEventListener('input',refresh);
+      refresh(); setOpen(false);
+    });
+    // 빈 곳(칸 바깥)을 누르면 접기. 칸 안에서 글을 드래그해서 고르다가 바깥에서 손을 뗀 경우는 접지 않는다.
+    let downCard=null;
+    document.addEventListener('pointerdown',(e)=>{ downCard=e.target.closest?e.target.closest('.fold-card'):null; },true);
+    document.addEventListener('click',(e)=>{
+      cards.forEach(card=>{
+        if(!card._isOpen || !card._isOpen()) return;
+        if(card.contains(e.target) || downCard===card) return;
+        card._setOpen(false);
+      });
+      downCard=null;
+    });
+    document.addEventListener('keydown',(e)=>{
+      if(e.key==='Escape') cards.forEach(card=>{ if(card._isOpen && card._isOpen()) card._setOpen(false); });
+    });
   })();
 
   let state=null;
@@ -2623,49 +2730,67 @@
     const box=document.getElementById('qnaHistoryBox');
     if(!box) return;
     if(qnaHistory.length===0){ box.innerHTML='<p style="font-size:12px;color:var(--ink-soft);margin:0;">아직 질문이 없습니다. 아래 칸에 질문을 입력해보세요.</p>'; return; }
-    // 오래된 질문이 위, 최신 질문이 아래 (채팅 방식)
-    box.innerHTML = qnaHistory.map(item=>`
+    // 오래된 질문이 위, 최신 질문이 아래 (채팅 방식). 질문은 보내자마자 올라가고, 답은 도착하면 채워진다.
+    box.innerHTML = qnaHistory.map(item=>{
+      let answerHtml;
+      if(item.a!=null) answerHtml=`<div class="ai-box show" style="margin-top:0;">${escapeHtml(item.a)}</div>`;
+      else if(item.err) answerHtml=`<div class="ai-box show" style="margin-top:0; color:var(--seal);">⚠️ ${escapeHtml(item.err)}</div>`;
+      else answerHtml=`<div class="ai-box show" style="margin-top:0; color:var(--ink-soft);">AI가 답변을 준비하고 있어요…</div>`;
+      return `
       <div class="qna-item">
         <div style="font-size:13px;font-weight:700;color:var(--ink);margin-bottom:6px;">Q. ${escapeHtml(item.q)}</div>
-        <div class="ai-box show" style="margin-top:0;">${escapeHtml(item.a)}</div>
-      </div>
-    `).join('');
+        ${answerHtml}
+      </div>`;
+    }).join('');
   }
+  function scrollToLastQna(){
+    const items=document.querySelectorAll('#qnaHistoryBox .qna-item');
+    const last=items[items.length-1];
+    if(last) last.scrollIntoView({behavior:'smooth', block:'start'});
+  }
+  let qnaBusy=false;
   async function askQna(){
-    if(!state) return;
+    if(!state || qnaBusy) return;
     const input=document.getElementById('qnaInput');
     const q = input.value.trim();
     if(!q) return;
-    const loading=document.getElementById('qnaLoading'), err=document.getElementById('qnaError'), btn=document.getElementById('qnaBtn');
+    const err=document.getElementById('qnaError'), btn=document.getElementById('qnaBtn');
     err.classList.remove('show'); err.textContent='';
-    loading.classList.add('show'); btn.disabled=true; btn.textContent='답변 중...';
-    loading.scrollIntoView({behavior:'smooth', block:'nearest'});
+    qnaBusy=true; btn.disabled=true; btn.textContent='답변 중...';
+
+    // 엔터를 치는 즉시 질문을 창에 올리고 입력칸을 비운다 (답은 나중에 채워진다)
+    const item={q, a:null, err:null};
+    qnaHistory.push(item);
+    input.value='';
+    autoGrow(input);
+    renderQnaHistory();
+    scrollToLastQna();
+
     try{
       const {s,dayStemIdx,isMale:im,counts,strength,ys,year,month,day}=state;
       const summary = buildSajuSummary(s, dayStemIdx, im, counts, strength, ys, year, month, day);
       const ctx = (document.getElementById('ctxShared').value||'').trim();
       const ctxBlock = ctx ? `\n\n[질문자가 알려준 현재 상황]\n${ctx}\n\n위 상황은 질문자가 직접 알려준 사실이니 이것만 참고하고, 확인되지 않은 과거사를 새로 지어내거나 마치 미리 알고 있었던 것처럼 단정하지 마.` : '';
-      // 앞선 대화(최근 10개)를 함께 보내서, 매번 다시 설명하지 않아도 이어서 답하도록 함
-      const past = qnaHistory.slice(-10).map((it,i)=>`Q${i+1}. ${it.q}\nA${i+1}. ${it.a}`).join('\n\n');
+      // 앞선 대화(답이 있는 최근 10개)를 함께 보내서, 매번 다시 설명하지 않아도 이어서 답하도록 함
+      const past = qnaHistory.filter(it=>it!==item && it.a!=null).slice(-10).map((it,i)=>`Q${i+1}. ${it.q}\nA${i+1}. ${it.a}`).join('\n\n');
       const histBlock = past ? `\n\n[지금까지 나눈 대화]\n${past}\n\n위 대화를 기억하고 이어서 답해줘. 질문에 "그럼", "그 시기", "그 사람", "아까 말한 것"처럼 앞 내용을 가리키는 말이 있으면 위 대화에서 찾아 이해하고, 이미 설명한 내용은 반복하지 말고 이어서 새로운 내용을 답해줘.` : '';
       const prompt = `다음은 질문자의 사주 정보입니다.\n\n${summary}${ctxBlock}${histBlock}\n\n반드시 위 [오늘 날짜]를 기준으로 '올해', '내년', '다음 달', '이번 달' 같은 시점을 해석하고, 이미 지나간 연도나 달을 앞으로 일어날 일처럼 말하지 마. 이 사주 정보(오행, 십신, 지장간, 십이운성, 형충회합, 용신, 대운 등)를 종합해서 아래 질문에 답변해줘. 두루뭉술하게 얼버무리지 말고, 명리학적으로 판단되는 결론을 첫 문장에서 직설적으로 먼저 제시한 뒤(예/아니오, 좋다/신중해야 한다, 적합하다/적합하지 않다 등 명확한 입장), 사주의 어떤 요소(오행 강약, 십신, 용신과의 관계, 대운 흐름, 형충회합 등) 때문에 그렇게 판단하는지 구체적 근거를 이어서 설명해줘. 분량 제한 없이 충분히 깊이 있게 한국어로 답해줘. 문단을 나눠 읽기 편하게 쓰되, 소제목·번호 목록·마크다운 기호(** 등) 없이 일반 글로 작성해줘.\n\n질문: ${q}`;
       const answer = await callClaude(prompt);
-      qnaHistory.push({q, a: answer||'답변을 받지 못했습니다.'});
-      input.value='';
-      autoGrow(input);
-      renderQnaHistory();
-      // 방금 받은 질문·답변이 화면 맨 위에 오도록 스크롤 → 스크롤 없이 바로 읽기
-      const items=document.querySelectorAll('#qnaHistoryBox .qna-item');
-      const last=items[items.length-1];
-      if(last) last.scrollIntoView({behavior:'smooth', block:'start'});
+      item.a = answer||'답변을 받지 못했습니다.';
     } catch(e){
-      err.innerHTML = '답변을 불러오지 못했습니다 (' + e.message + ').<br>다시 시도해주세요.';
-      err.classList.add('show');
-      err.scrollIntoView({behavior:'smooth', block:'nearest'});
+      item.err = '답변을 불러오지 못했습니다 (' + e.message + '). 같은 질문을 다시 보내 주세요.';
+      // 방금 보낸 질문을 입력칸에 되돌려 놓아서, 다시 쓰지 않고 엔터만 치면 되게 한다
+      const inp=document.getElementById('qnaInput');
+      if(inp && !inp.value){ inp.value=q; autoGrow(inp); }
     } finally {
-      loading.classList.remove('show'); btn.disabled=false; btn.textContent='질문하기';
+      qnaBusy=false;
+      const b=document.getElementById('qnaBtn');
+      if(b){ b.disabled=false; b.textContent='질문하기'; }
+      renderQnaHistory();
+      scrollToLastQna();
     }
   }
+
 })();
 </script>
 
