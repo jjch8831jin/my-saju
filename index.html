@@ -363,26 +363,21 @@
     <div class="panel" id="aiKeyPanel">
       <h3>AI 심층 풀이 설정 (Gemini API 키)</h3>
       <p style="font-size:12.5px;color:var(--ink-soft);line-height:1.7;margin:0 0 10px;">
-        아래 각 탭의 'AI 심층 풀이' 버튼은 직접 발급받은 Google Gemini API 키로 작동합니다. '키 저장'을 누르면 이 브라우저에 저장되어 다음에 열 때 다시 입력하지 않아도 됩니다. 이 HTML 파일 자체나 서버로는 전송되지 않으며, 언제든 '클릭하여 변경'으로 삭제하거나 바꿀 수 있어요.
+        아래 각 탭의 'AI 심층 풀이' 버튼은 직접 발급받은 Google Gemini API 키로 작동합니다. 키를 여러 개 등록해 두면, 한 키가 하루 사용 한도에 걸렸을 때 자동으로 다음 키로 넘어가서 계속 쓸 수 있어요. 키는 이 브라우저에만 저장되고 이 HTML 파일 자체나 서버로는 전송되지 않으며, 언제든 삭제할 수 있어요.
       </p>
-      <div id="keyEnteredView" style="display:none;">
-        <button type="button" id="keyChangeBtn" class="go-btn" style="background:#3d7a5c;border-color:#3d7a5c;">API 키 등록됨 ✓ (클릭하여 변경)</button>
-      </div>
-      <div id="keyInputView" style="display:block;">
-        <div class="mini-form">
-          <div class="field" style="flex:2;">
-            <label style="font-size:11px;color:var(--ink-soft);">Gemini API 키</label>
-            <input type="password" id="geminiKey" placeholder="AIza..." style="font-family:inherit;font-size:13.5px;padding:9px 10px;border:1px solid var(--rule);border-radius:8px;background:#fffdf7;width:100%;">
-          </div>
+      <div id="keyList" style="display:flex; flex-direction:column; gap:6px; margin-bottom:10px;"></div>
+      <div class="mini-form">
+        <div class="field" style="flex:2;">
+          <label style="font-size:11px;color:var(--ink-soft);">Gemini API 키 추가 (최대 5개, 서로 다른 계정의 키를 넣으면 한도를 따로 써요)</label>
+          <input type="password" id="geminiKey" placeholder="AIza..." style="font-family:inherit;font-size:13.5px;padding:9px 10px;border:1px solid var(--rule);border-radius:8px;background:#fffdf7;width:100%;">
         </div>
-        <div style="display:flex; gap:8px; margin-top:2px;">
-          <button type="button" id="keySaveBtn" class="go-btn" style="flex:1;">키 저장</button>
-          <button type="button" id="keyClearBtn" class="go-btn" style="flex:0 0 auto; background:#fffdf7; color:var(--ink); border-color:var(--rule);">삭제</button>
-        </div>
-        <div class="ai-error" id="keyTestError" style="margin-top:8px;"></div>
-        <div style="margin-top:8px; display:none; font-size:12.5px; color:#3d7a5c; font-weight:700;" id="keyTestSuccess">✓ 키가 정상적으로 확인됐어요.</div>
-        <div class="ai-loading" id="keyTestLoading" style="margin-top:8px;">키를 확인하고 있어요...</div>
       </div>
+      <div style="display:flex; gap:8px; margin-top:2px;">
+        <button type="button" id="keySaveBtn" class="go-btn" style="flex:1;">키 추가</button>
+      </div>
+      <div class="ai-error" id="keyTestError" style="margin-top:8px;"></div>
+      <div style="margin-top:8px; display:none; font-size:12.5px; color:#3d7a5c; font-weight:700;" id="keyTestSuccess"></div>
+      <div class="ai-loading" id="keyTestLoading" style="margin-top:8px;">키를 확인하고 있어요...</div>
       <p style="font-size:11.5px;color:var(--ink-soft);margin:10px 0 0;">키가 없다면 <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener" style="color:var(--seal);">Google AI Studio</a>에서 무료로 발급받을 수 있어요.</p>
       <button type="button" id="btnViewSource" class="go-btn" style="margin-top:14px; background:#f7c896; color:#7a4a10; border-color:#e8a860;">&lt;/&gt; 이 페이지 소스보기</button>
     </div>
@@ -1325,7 +1320,10 @@
   // ---- AI 호출 ----
   function sleep(ms){ return new Promise(r=>setTimeout(r,ms)); }
   const GEMINI_MODEL='gemini-2.5-flash';
-  const KEY_STORAGE_NAME='saju_gemini_api_key';
+  const KEY_STORAGE_NAME='saju_gemini_api_key';           // (예전 방식: 키 1개) — 목록으로 옮기는 데만 쓴다
+  const KEYS_STORAGE_NAME='saju_gemini_api_keys';        // 키 목록 [{id, key}]
+  const ACTIVE_KEY_STORAGE_NAME='saju_gemini_active_key_id';
+  const MAX_KEYS=5;
   const GUIDE_STORAGE_NAME='saju_ai_guideline';
   function loadGuideline(){ try{ return localStorage.getItem(GUIDE_STORAGE_NAME)||''; }catch(e){ return ''; } }
   function saveGuideline(v){ try{ localStorage.setItem(GUIDE_STORAGE_NAME, v); }catch(e){} }
@@ -1350,11 +1348,34 @@
     saveRecords(list);
   }
   function loadStoredKey(){ try{ return localStorage.getItem(KEY_STORAGE_NAME)||''; }catch(e){ return ''; } }
-  function saveStoredKey(k){ try{ localStorage.setItem(KEY_STORAGE_NAME,k); }catch(e){} }
-  function clearStoredKey(){ try{ localStorage.removeItem(KEY_STORAGE_NAME); }catch(e){} }
-  async function callClaudeOnce(promptText){
-    const key = loadStoredKey().trim();
-    if(!key){ const e=new Error('Gemini API 키를 먼저 위 칸에 입력하고 저장해주세요.'); e.status=400; throw e; }
+  function saveKeyList(list){ try{ localStorage.setItem(KEYS_STORAGE_NAME, JSON.stringify(list)); }catch(e){} }
+  function loadActiveKeyId(){ try{ return localStorage.getItem(ACTIVE_KEY_STORAGE_NAME)||''; }catch(e){ return ''; } }
+  function setActiveKeyId(id){ try{ localStorage.setItem(ACTIVE_KEY_STORAGE_NAME,id); }catch(e){} }
+  function loadKeyList(){
+    let list=[];
+    try{ list=JSON.parse(localStorage.getItem(KEYS_STORAGE_NAME)||'[]'); if(!Array.isArray(list)) list=[]; }catch(e){ list=[]; }
+    list=list.filter(k=>k && k.key);
+    if(list.length===0){
+      // 예전 방식(키 하나)으로 저장해 둔 키가 있으면 목록으로 옮긴다
+      const old=loadStoredKey().trim();
+      if(old){
+        list=[{id:'k_'+Date.now().toString(36), key:old}];
+        saveKeyList(list); setActiveKeyId(list[0].id);
+        try{ localStorage.removeItem(KEY_STORAGE_NAME); }catch(e){}
+      }
+    }
+    return list;
+  }
+  function maskKey(k){ return k.length>10 ? k.slice(0,4)+'…'+k.slice(-4) : '••••'; }
+  // 그 키 자체의 문제(한도 초과·잘못된 키·권한 없음)인지 — 그렇다면 다음 키로 넘어간다
+  function isKeyError(e){
+    const st=e && e.status, m=String((e&&e.message)||'').toLowerCase();
+    return st===429 || st===403 || m.includes('quota') || m.includes('resource_exhausted') || m.includes('rate limit')
+      || (st===400 && (m.includes('api key') || m.includes('api_key')));
+  }
+  async function callClaudeOnce(promptText, keyArg){
+    const key = String(keyArg||'').trim();
+    if(!key){ const e=new Error('Gemini API 키를 먼저 아래의 API 키 설정에서 추가해주세요.'); e.status=400; throw e; }
     const url = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${encodeURIComponent(key)}`;
     const resp = await fetch(url, {
       method:'POST', headers:{'Content-Type':'application/json'},
@@ -1373,16 +1394,14 @@
     const text = parts ? parts.map(p=>p.text||'').join('') : '';
     return text.trim();
   }
-  async function callClaude(promptText, retries){
-    retries = retries===undefined ? 2 : retries;
+  // 한 키로 호출: 일시적 오류(5xx)는 잠깐 대기 후 재시도
+  async function callWithKey(finalPrompt, key, retries){
     let lastErr;
-    const finalPrompt = promptText + guidelineBlock();
     for(let attempt=0; attempt<=retries; attempt++){
       try{
-        return await callClaudeOnce(finalPrompt);
+        return await callClaudeOnce(finalPrompt, key);
       } catch(e){
         lastErr = e;
-        // 일시적 오류(5xx)는 잠깐 대기 후 재시도, 그 외(4xx, 키 미입력 등)는 바로 포기
         const transient = e.status && e.status>=500;
         if(attempt<retries && transient){ await sleep(900*(attempt+1)); continue; }
         throw lastErr;
@@ -1390,6 +1409,35 @@
     }
     throw lastErr;
   }
+  // 등록한 키를 차례로 써 보고, 한도에 걸리거나 못 쓰는 키면 자동으로 다음 키로 넘어간다
+  async function callClaude(promptText, retries){
+    retries = retries===undefined ? 2 : retries;
+    const finalPrompt = promptText + guidelineBlock();
+    const list=loadKeyList();
+    if(list.length===0){ const e=new Error('Gemini API 키를 먼저 아래의 API 키 설정에서 추가해주세요.'); e.status=400; throw e; }
+    const activeId=loadActiveKeyId();
+    const startIdx=Math.max(0, list.findIndex(k=>k.id===activeId));
+    let lastErr, keyErrCount=0;
+    for(let n=0;n<list.length;n++){
+      const k=list[(startIdx+n)%list.length];
+      try{
+        const text=await callWithKey(finalPrompt, k.key, retries);
+        if(k.id!==activeId){ setActiveKeyId(k.id); if(typeof renderKeyList==='function') renderKeyList(); }
+        return text;
+      } catch(e){
+        lastErr=e;
+        if(isKeyError(e)){ keyErrCount++; continue; }
+        throw e;
+      }
+    }
+    if(list.length>1 && keyErrCount===list.length){
+      const err=new Error(`등록한 키 ${list.length}개가 모두 사용 한도에 걸렸거나 쓸 수 없어요. (${lastErr.message})`);
+      err.status=lastErr.status;
+      throw err;
+    }
+    throw lastErr;
+  }
+
   function wireAI(btnId, loadingId, errorId, boxId, promptBuilder){
     const btn=document.getElementById(btnId), loading=document.getElementById(loadingId);
     const err=document.getElementById(errorId), box=document.getElementById(boxId);
@@ -1638,54 +1686,104 @@
   document.getElementById('chkTrueSolar').addEventListener('change',()=>{ buildShiOptions(); applyShiChoice(); });
   buildShiOptions();
 
-  // ---- API 키 저장 UI ----
-  const keyEnteredView=document.getElementById('keyEnteredView');
-  const keyInputView=document.getElementById('keyInputView');
+  // ---- API 키 목록 UI ----
   const geminiKeyInput=document.getElementById('geminiKey');
-  const keyChangeBtn=document.getElementById('keyChangeBtn');
   const keySaveBtn=document.getElementById('keySaveBtn');
-  const keyClearBtn=document.getElementById('keyClearBtn');
   const keyTestError=document.getElementById('keyTestError');
   const keyTestSuccess=document.getElementById('keyTestSuccess');
   const keyTestLoading=document.getElementById('keyTestLoading');
-  function updateKeyUI(){
-    const stored=loadStoredKey();
-    if(stored){ keyEnteredView.style.display='block'; keyInputView.style.display='none'; }
-    else { keyEnteredView.style.display='none'; keyInputView.style.display='block'; }
+  const keyListEl=document.getElementById('keyList');
+  function resetKeyMsgs(){
+    keyTestError.classList.remove('show'); keyTestError.textContent='';
+    keyTestSuccess.style.display='none'; keyTestSuccess.textContent='';
   }
-  geminiKeyInput.value = loadStoredKey();
-  updateKeyUI();
-  keyChangeBtn.addEventListener('click',()=>{
-    geminiKeyInput.value = loadStoredKey();
-    keyEnteredView.style.display='none';
-    keyInputView.style.display='block';
-    keyTestError.classList.remove('show'); keyTestSuccess.style.display='none';
-    geminiKeyInput.focus();
-  });
+  function showKeyError(html){ keyTestError.innerHTML=html; keyTestError.classList.add('show'); }
+  function showKeyOk(text){ keyTestSuccess.textContent=text; keyTestSuccess.style.display='block'; }
+  async function testOneKey(key){
+    resetKeyMsgs(); keyTestLoading.classList.add('show');
+    try{ await callClaudeOnce('안녕', key); showKeyOk('✓ 이 키는 정상이에요.'); }
+    catch(e){ showKeyError('키 확인 실패: ' + e.message); }
+    finally{ keyTestLoading.classList.remove('show'); }
+  }
+  function renderKeyList(){
+    const list=loadKeyList();
+    let activeId=loadActiveKeyId();
+    if(list.length>0 && !list.some(k=>k.id===activeId)){ activeId=list[0].id; setActiveKeyId(activeId); }
+    keyListEl.innerHTML='';
+    if(list.length===0){
+      const d=document.createElement('div');
+      d.style.cssText='font-size:12.5px;color:var(--ink-soft);';
+      d.textContent='아직 등록된 키가 없어요. 아래에 키를 추가해 주세요.';
+      keyListEl.appendChild(d);
+      return;
+    }
+    const btnCss='padding:4px 10px; border-radius:6px; border:1px solid var(--rule); background:#fffdf7; color:var(--ink); cursor:pointer; font-family:inherit;';
+    list.forEach((k,i)=>{
+      const row=document.createElement('div');
+      row.style.cssText='display:flex; flex-wrap:wrap; align-items:center; gap:6px; padding:8px 10px; background:#fffdf7; border:1px solid var(--rule); border-radius:8px;';
+      const label=document.createElement('span');
+      label.style.cssText='flex:1; min-width:150px;';
+      label.textContent=`키 ${i+1} · ${maskKey(k.key)}`;
+      row.appendChild(label);
+      if(k.id===activeId){
+        const badge=document.createElement('span');
+        badge.textContent='사용 중';
+        badge.style.cssText='padding:2px 8px; border-radius:10px; background:#3d7a5c; color:#fff; font-weight:700;';
+        row.appendChild(badge);
+      } else {
+        const use=document.createElement('button'); use.type='button'; use.textContent='이 키부터 사용'; use.style.cssText=btnCss;
+        use.onclick=()=>{ setActiveKeyId(k.id); resetKeyMsgs(); renderKeyList(); };
+        row.appendChild(use);
+      }
+      const test=document.createElement('button'); test.type='button'; test.textContent='확인'; test.style.cssText=btnCss;
+      test.onclick=()=>testOneKey(k.key);
+      row.appendChild(test);
+      const del=document.createElement('button'); del.type='button'; del.textContent='삭제'; del.style.cssText=btnCss+'color:var(--seal);';
+      del.onclick=()=>{
+        if(!confirm(`키 ${i+1}을(를) 삭제할까요?`)) return;
+        const next=loadKeyList().filter(x=>x.id!==k.id);
+        saveKeyList(next);
+        if(loadActiveKeyId()===k.id) setActiveKeyId(next[0]?next[0].id:'');
+        resetKeyMsgs(); renderKeyList();
+      };
+      row.appendChild(del);
+      keyListEl.appendChild(row);
+    });
+  }
+  renderKeyList();
   keySaveBtn.addEventListener('click', async ()=>{
     const v=geminiKeyInput.value.trim();
     if(!v) return;
-    keyTestError.classList.remove('show'); keyTestError.textContent='';
-    keyTestSuccess.style.display='none';
+    resetKeyMsgs();
+    const list=loadKeyList();
+    if(list.some(k=>k.key===v)){ showKeyError('이미 등록된 키예요.'); return; }
+    if(list.length>=MAX_KEYS){ showKeyError(`키는 최대 ${MAX_KEYS}개까지 등록할 수 있어요. 안 쓰는 키를 삭제한 뒤 추가해 주세요.`); return; }
     keyTestLoading.classList.add('show');
     keySaveBtn.disabled=true;
-    saveStoredKey(v);
+    let addIt=false, note='';
     try{
-      await callClaudeOnce('안녕');
-      keyTestSuccess.style.display='block';
-      updateKeyUI();
+      await callClaudeOnce('안녕', v);
+      addIt=true; note='✓ 키가 정상적으로 확인되어 추가했어요.';
     } catch(e){
-      keyTestError.innerHTML = '키 확인 실패: ' + e.message + '<br>키를 다시 확인해서 붙여넣어 주세요. (저장은 되었지만, 이 키로는 호출이 안 될 수 있어요)';
-      keyTestError.classList.add('show');
+      const m=String(e.message||'').toLowerCase();
+      if(e.status===429 || m.includes('quota') || m.includes('resource_exhausted')){
+        addIt=true; note='키를 추가했어요. 지금은 사용 한도에 걸려 있어서 정상 여부는 확인하지 못했어요.';
+      } else {
+        showKeyError('키 확인 실패: ' + e.message + '<br>키를 다시 확인해서 붙여넣어 주세요. (추가하지 않았어요)');
+      }
     } finally {
       keyTestLoading.classList.remove('show');
       keySaveBtn.disabled=false;
     }
-  });
-  keyClearBtn.addEventListener('click',()=>{
-    clearStoredKey();
-    geminiKeyInput.value='';
-    updateKeyUI();
+    if(addIt){
+      const id='k_'+Date.now().toString(36)+Math.random().toString(36).slice(2,5);
+      list.push({id, key:v});
+      saveKeyList(list);
+      if(list.length===1 || !loadActiveKeyId()) setActiveKeyId(id);
+      geminiKeyInput.value='';
+      renderKeyList();
+      showKeyOk(note);
+    }
   });
 
   // ---- 입력칸 자동 세로 확장 ----
