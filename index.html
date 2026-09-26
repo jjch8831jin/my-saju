@@ -2791,7 +2791,14 @@
       cpCtx = { myFull, partnerFull, crossLines, elemVerdict, elemText, branchVerdict, branchText };
       cpQnaHistory = [];
 
+      let cpPillarsHtml = pillarHTML('시주 · 時柱', p.hour, p.day.stem, false, pHasTime)
+        + pillarHTML('일주 · 日柱', p.day, p.day.stem, true, true)
+        + pillarHTML('월주 · 月柱', p.month, p.day.stem, false, true)
+        + pillarHTML('년주 · 年柱', p.year, p.day.stem, false, true);
+
       document.getElementById('cpResult').innerHTML = `
+        <h5>상대방 사주 원국</h5>
+        <div class="pillars" style="grid-template-columns:repeat(4,1fr);">${cpPillarsHtml}</div>
         <h5>일간 오행 궁합 — ${elemVerdict}</h5>
         <p>나: ${STEM_HANJA[dayStemIdx]}(${myElem}) · 상대: ${STEM_HANJA[p.day.stem]}(${partnerElem})<br>${elemText}</p>
         <h5>띠(년지) 궁합 — ${branchVerdict}</h5>
