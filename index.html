@@ -869,9 +869,34 @@
     return `이 시기에는 격국(${gyeok.gyeokName})을 정한 글자가 ${dynamicLabel}과 ${hits.map(r=>r.type).join('·')} 관계가 되어, 격의 성격이 흔들리거나 다른 기운으로 바뀔 수 있는 시기입니다.`;
   }
 
-  function determineGyeokguk(s, dayStemIdx, strengthRatio){
+  // 외격(종격) 세분화: 이미 계산된 오행 개수·억부 비율로 종왕·종강·종아·종재·종살격 후보를 가려봄 (참고용)
+  function classifyOegyeok(dayElem, counts){
+    if(!dayElem || !counts) return null;
+    const bigyeop=counts[dayElem]||0;
+    const inseong=counts[REV_GENERATES[dayElem]]||0;
+    const siksang=counts[GENERATES[dayElem]]||0;
+    const jaeseong=counts[CONTROLS[dayElem]]||0;
+    const gwanseong=counts[REV_CONTROLS[dayElem]]||0;
+    if(bigyeop+inseong >= siksang+jaeseong+gwanseong){
+      // 신강 극단: 비겁·인성 위주 → 종왕격(비겁 위주) / 종강격(인성 위주)
+      if(bigyeop===0 && inseong===0) return null;
+      return bigyeop>=inseong
+        ? { name:'종왕격', note:`비겁(${dayElem}) ${bigyeop}개로 인성(${REV_GENERATES[dayElem]}) ${inseong}개보다 많아, 일간과 같은 세력을 그대로 따르는 종왕격 후보로 보입니다.` }
+        : { name:'종강격', note:`인성(${REV_GENERATES[dayElem]}) ${inseong}개가 비겁(${dayElem}) ${bigyeop}개보다 많아, 나를 생하는 세력을 따르는 종강격 후보로 보입니다.` };
+    }
+    // 신약 극단: 식상·재성·관성 중 가장 많은 쪽을 따름
+    const max=Math.max(siksang, jaeseong, gwanseong);
+    if(max===0) return null;
+    if(max===siksang) return { name:'종아격', note:`식상(${GENERATES[dayElem]}) ${siksang}개가 가장 많아, 내가 생하는 세력을 따르는 종아격 후보로 보입니다.` };
+    if(max===jaeseong) return { name:'종재격', note:`재성(${CONTROLS[dayElem]}) ${jaeseong}개가 가장 많아, 내가 극하는 세력을 따르는 종재격 후보로 보입니다.` };
+    return { name:'종살격', note:`관성(${REV_CONTROLS[dayElem]}) ${gwanseong}개가 가장 많아, 나를 극하는 세력을 따르는 종살격(종관격) 후보로 보입니다.` };
+  }
+  function determineGyeokguk(s, dayStemIdx, strengthRatio, counts, dayElem){
     if(strengthRatio!==undefined && (strengthRatio<=0.15 || strengthRatio>=0.85)){
-      return { gyeokName:null, warning:'외격', note:`억부 비율이 매우 극단적(지지력 약 ${Math.round(strengthRatio*100)}%)이라 종격 등 외격 후보로 보이며, 일반적인 내격 판정을 적용하기 어렵습니다.` };
+      const og=classifyOegyeok(dayElem, counts);
+      const base=`억부 비율이 매우 극단적(지지력 약 ${Math.round(strengthRatio*100)}%)이라 종격 등 외격 후보로 보이며, 일반적인 내격 판정을 적용하기 어렵습니다.`;
+      if(og) return { gyeokName:null, warning:'외격', oegyeokName:og.name, note:`${base} 오행 개수로 볼 때 ${og.note} 다만 이 판정도 간략화된 참고용이며, 실제로는 형충회합으로 세력이 깨지지 않았는지까지 함께 봐야 확정할 수 있습니다.` };
+      return { gyeokName:null, warning:'외격', note:base };
     }
     const mb=s.month.branch;
     const hiddenIdx=HIDDEN[mb].map(h=>STEM_HANJA.indexOf(h)); // [여기, (중기), 정기] 순
@@ -1473,11 +1498,12 @@
     const named=detectNamedSinsal(s);
     if(detectWoldeok(s)) named.push('월덕귀인');
     if(detectCheonuiseong(s)) named.push('천의성');
-    const gyeok=determineGyeokguk(s, dayStemIdx, assessStrength(s, dayStemIdx).ratio);
+    const gyeok=determineGyeokguk(s, dayStemIdx, assessStrength(s, dayStemIdx).ratio, state.counts, state.dayElem);
     const gmLabel=gongmang.map(b=>BRANCH_HANJA[b]).join('·');
     let noteHtml = `<span>공망(空亡): ${gmLabel}</span>`;
     if(gyeok.warning==='외격'){
-      noteHtml += ` <span style="margin-left:10px;color:var(--seal);">· 외격(外格) 가능성 — ${gyeok.note}</span>`;
+      const label = gyeok.oegyeokName ? `외격(外格) — ${gyeok.oegyeokName} 후보` : '외격(外格) 가능성';
+      noteHtml += ` <span style="margin-left:10px;color:var(--seal);">· ${label} — ${gyeok.note}</span>`;
     } else if(gyeok.warning==='파격'){
       noteHtml += ` <span style="margin-left:10px;color:var(--seal);">· 격국(참고): ${gyeok.gyeokName} → 파격(破格) 가능성 — ${gyeok.note}</span>`;
     } else {
@@ -1760,6 +1786,10 @@
     return '노년기(70대 이후)';
   }
 
+  // 전문가처럼 격국·통근·형충회합을 스스로 종합 판단하도록 AI에게 주는 공통 통변 지침
+  function expertGyeokGuidance(){
+    return `\n\n[통변 방식 안내] 사주를 볼 때 다음을 지켜줘: 위에 주어진 격국은 기계적으로 간략화한 참고용 판정이니 그대로 믿지 말고, 함께 주어진 통근·투출·형충회합·용신 정보를 종합해서 그 격이 실제로 얼마나 튼튼한지 스스로 판단해줘. 격을 정한 글자가 통근(지장간에 뿌리)이 있으면 힘 있는 격으로, 뿌리 없이 천간에만 떠 있으면 약한 격으로 봐줘. "파격 가능성"이 적혀 있으면, 그 관계가 합인지 충인지와 주변 글자들을 근거로 "완전히 깨졌다 / 흔들리는 정도다 / 오히려 좋아졌다" 중 어디에 가까운지 네 판단을 밝혀줘. "외격 가능성"이 적혀 있으면, 인성·비겁의 유무를 근거로 실제 종격에 가까운지 아니면 억부법을 그대로 적용해도 되는지 판단해줘. 이런 판단은 막연한 추측이 아니라, 위에 주어진 구체적 데이터(통근·형충회합·오행 개수·용신)를 근거로 논리적으로 설명해줘.`;
+  }
   function buildSajuSummary(s, dayStemIdx, isMaleFlag, counts, strength, ys, year, month, day){
     const p=(part)=> part ? `${STEM_HANJA[part.stem]}${BRANCH_HANJA[part.branch]}(${STEMS[part.stem]}${BRANCHES[part.branch]}, ${STEM_ELEM[part.stem]}/${BRANCH_ELEM[part.branch]})` : '모름';
     const nowYearForAge = new Date().getFullYear();
@@ -1819,9 +1849,10 @@
     const gwiinMap=detectGwiinBranches(s);
     const gwiinHits=sinsalParts.filter(([k,b])=>gwiinMap[b]&&gwiinMap[b].length).map(([k,b])=>`${k}=${gwiinMap[b].join('·')}`);
     lines.push('귀인(천을귀인·문창귀인): ' + (gwiinHits.length? gwiinHits.join(', ') : '해당 없음'));
-    const gyeok=determineGyeokguk(s, dayStemIdx, assessStrength(s, dayStemIdx).ratio);
+    const gyeok=determineGyeokguk(s, dayStemIdx, assessStrength(s, dayStemIdx).ratio, counts, STEM_ELEM[dayStemIdx]);
     if(gyeok.warning==='외격'){
-      lines.push(`격국(참고): 외격(外格) 가능성 — ${gyeok.note} 내격 판정은 생략했습니다.`);
+      const label = gyeok.oegyeokName ? `외격(外格) — ${gyeok.oegyeokName} 후보` : '외격(外格) 가능성';
+      lines.push(`격국(참고): ${label} — ${gyeok.note} 내격 판정은 생략했습니다.`);
     } else if(gyeok.warning==='파격'){
       lines.push(`격국(참고, 간략화된 판정): ${gyeok.gyeokName} → 파격(破格) 가능성 — ${gyeok.note}`);
     } else {
@@ -2734,7 +2765,7 @@
       ? '<p style="font-size:12.5px;color:var(--ink-soft);">원국과 이 대운 사이에 특별히 두드러진 형충회합 관계는 나타나지 않았습니다.</p>'
       : combinedRels.map(relItemHTML).join('');
     const stageHTML = branchList.map(b=>{ const st=twelveStage(dayStemIdx,b.idx); return `<div class="rel-item stage-btn" data-stage="${st}" style="display:inline-block;margin-right:6px;cursor:pointer;"><b>${b.label}</b> ${BRANCH_HANJA[b.idx]}(${BRANCHES[b.idx]}) — 십이운성 <b style="color:var(--gold);">${st}</b></div>`; }).join('');
-    const gyeok=determineGyeokguk(s, dayStemIdx, assessStrength(s, dayStemIdx).ratio);
+    const gyeok=determineGyeokguk(s, dayStemIdx, assessStrength(s, dayStemIdx).ratio, state.counts, state.dayElem);
     const gyeokNote=gyeokFeedbackNote(gyeok, combinedRels, '대운간');
 
     document.getElementById('panel-daewoon').innerHTML = `
@@ -2759,7 +2790,7 @@
       const ctxBlock = ctx ? `\n\n[질문자가 알려준 현재 상황]\n${ctx}\n\n위 상황은 질문자가 직접 알려준 사실이니 이것만 참고하고, 확인되지 않은 사실을 새로 지어내지 마.` : '';
       const relBlock = combinedRels.length ? `\n원국+대운 형충회합: ${combinedRels.map(r=>`${r.pair.join('-')} ${r.type}`).join(', ')}` : '';
       const gyeokBlock = gyeokNote ? `\n${gyeokNote}` : '';
-      return `다음은 한 사람의 사주 정보입니다.\n\n${summary}${relBlock}${gyeokBlock}${ctxBlock}\n\n이 사람의 "${item.label}"(만 나이 약 ${item.ageFrom}~${item.ageTo}세, 대운 간지 ${STEM_HANJA[item.stem]}${BRANCH_HANJA[item.branch]}, 천간 십신 ${tgStem}, 지지 십신 ${tgBranch}, 십이운성 ${stage}, 용신 기준 ${gyText})에 대해 구체적으로 풀이해줘. 원국과 이 대운 사이의 형충회합 관계도 참고해줘. 이 시기에 예상되는 직업·재물·건강·대인관계 흐름을 중심으로, 두루뭉술하게 얼버무리지 말고 명확한 어조로 결론부터 제시한 뒤 근거를 설명해줘. 분량 제한 없이 충분히 길고 깊이 있게 한국어로 써줘. 문단을 나눠 읽기 편하게 쓰되, 소제목·번호 목록·마크다운 기호(** 등) 없이 일반 글로 작성해줘.`;
+      return `다음은 한 사람의 사주 정보입니다.\n\n${summary}${relBlock}${gyeokBlock}${ctxBlock}${expertGyeokGuidance()}\n\n이 사람의 "${item.label}"(만 나이 약 ${item.ageFrom}~${item.ageTo}세, 대운 간지 ${STEM_HANJA[item.stem]}${BRANCH_HANJA[item.branch]}, 천간 십신 ${tgStem}, 지지 십신 ${tgBranch}, 십이운성 ${stage}, 용신 기준 ${gyText})에 대해 구체적으로 풀이해줘. 원국과 이 대운 사이의 형충회합 관계도 참고해줘. 이 시기에 예상되는 직업·재물·건강·대인관계 흐름을 중심으로, 두루뭉술하게 얼버무리지 말고 명확한 어조로 결론부터 제시한 뒤 근거를 설명해줘. 분량 제한 없이 충분히 길고 깊이 있게 한국어로 써줘. 문단을 나눠 읽기 편하게 쓰되, 소제목·번호 목록·마크다운 기호(** 등) 없이 일반 글로 작성해줘.`;
     });
   }
 
@@ -2811,7 +2842,7 @@
       ? '<p style="font-size:12.5px;color:var(--ink-soft);">원국과 이 세운 사이에 특별히 두드러진 형충회합 관계는 나타나지 않았습니다.</p>'
       : combinedRels.map(relItemHTML).join('');
     const stageHTML = branchList.map(b=>{ const st=twelveStage(dayStemIdx,b.idx); return `<div class="rel-item stage-btn" data-stage="${st}" style="display:inline-block;margin-right:6px;cursor:pointer;"><b>${b.label}</b> ${BRANCH_HANJA[b.idx]}(${BRANCHES[b.idx]}) — 십이운성 <b style="color:var(--gold);">${st}</b></div>`; }).join('');
-    const gyeok=determineGyeokguk(s, dayStemIdx, assessStrength(s, dayStemIdx).ratio);
+    const gyeok=determineGyeokguk(s, dayStemIdx, assessStrength(s, dayStemIdx).ratio, state.counts, state.dayElem);
     const gyeokNote=gyeokFeedbackNote(gyeok, combinedRels, '세운간');
 
     document.getElementById('panel-sewoon').innerHTML = `
@@ -2836,7 +2867,7 @@
       const ctxBlock = ctx ? `\n\n[질문자가 알려준 현재 상황]\n${ctx}\n\n위 상황은 질문자가 직접 알려준 사실이니 이것만 참고하고, 확인되지 않은 사실을 새로 지어내지 마.` : '';
       const relBlock = combinedRels.length ? `\n원국+세운 형충회합: ${combinedRels.map(r=>`${r.pair.join('-')} ${r.type}`).join(', ')}` : '';
       const gyeokBlock = gyeokNote ? `\n${gyeokNote}` : '';
-      return `다음은 한 사람의 사주 정보입니다.\n\n${summary}${relBlock}${gyeokBlock}${ctxBlock}\n\n이 사람의 ${yy}년 세운(간지 ${STEM_HANJA[stem]}${BRANCH_HANJA[branch]}, 천간 십신 ${tgStem}, 지지 십신 ${tgBranch}, 십이운성 ${stage}, 용신 기준 ${gyText})에 대해 구체적으로 풀이해줘. 원국과 이 세운 사이의 형충회합 관계도 참고해줘. 이 해에 예상되는 직업·재물·건강·대인관계 흐름을 상반기/하반기로 나누어, 두루뭉술하게 얼버무리지 말고 명확한 어조로 결론부터 제시한 뒤 근거를 설명해줘. 분량 제한 없이 충분히 길고 깊이 있게 한국어로 써줘. 문단을 나눠 읽기 편하게 쓰되, 소제목·번호 목록·마크다운 기호(** 등) 없이 일반 글로 작성해줘.`;
+      return `다음은 한 사람의 사주 정보입니다.\n\n${summary}${relBlock}${gyeokBlock}${ctxBlock}${expertGyeokGuidance()}\n\n이 사람의 ${yy}년 세운(간지 ${STEM_HANJA[stem]}${BRANCH_HANJA[branch]}, 천간 십신 ${tgStem}, 지지 십신 ${tgBranch}, 십이운성 ${stage}, 용신 기준 ${gyText})에 대해 구체적으로 풀이해줘. 원국과 이 세운 사이의 형충회합 관계도 참고해줘. 이 해에 예상되는 직업·재물·건강·대인관계 흐름을 상반기/하반기로 나누어, 두루뭉술하게 얼버무리지 말고 명확한 어조로 결론부터 제시한 뒤 근거를 설명해줘. 분량 제한 없이 충분히 길고 깊이 있게 한국어로 써줘. 문단을 나눠 읽기 편하게 쓰되, 소제목·번호 목록·마크다운 기호(** 등) 없이 일반 글로 작성해줘.`;
     });
   }
 
@@ -2930,7 +2961,7 @@
       const summary = buildSajuSummary(s, dayStemIdx, im, counts, strength, ys, year, month, day);
       const ctx = (document.getElementById('ctxShared').value||'').trim();
       const ctxBlock = ctx ? `\n\n[질문자가 알려준 현재 상황]\n${ctx}\n\n위 상황은 질문자가 직접 알려준 사실이니 이것만 참고하고, 확인되지 않은 과거사를 새로 지어내거나 마치 미리 알고 있었던 것처럼 단정하지 마.` : '';
-      return `다음은 한 사람의 사주 정보입니다.\n\n${summary}${ctxBlock}\n\n이 정보를 바탕으로 전문 명리학자가 직접 상담하듯 따뜻하고 구체적인 어조로 "성격과 특징"에 초점을 맞춘 심도 있는 사주풀이를 한국어로 작성해줘. 특히 사주에 나타난 일곱 자리(년간·년지·월간·월지·일지·시간·시지)의 십신을 하나하나 근거로 삼아서, 그 사람의 성격·기질·대인관계 방식·강점과 약점을 구체적으로 풀어줘(예: 어떤 십신이 있어서 어떤 성향이 강하다는 식으로 근거를 짚어줘). 반드시 위에 적힌 출생년도와 현재 나이·인생 시기를 반영해서, 그 나이대에 실제로 해당하는 이야기(예: 10대라면 학업·진로 탐색, 20~30대라면 사회 진출과 자립, 40~50대라면 커리어 성숙과 가정, 60대 이후라면 정리와 안정 등)를 중심으로 풀어줘. 나이와 무관하게 아무에게나 적용될 법한 일반론적인 문장은 피해줘. 타고난 성격과 기질, 강점과 보완하면 좋은 점, 대인관계 스타일, 지금 나이대에 맞는 직업·재물 조언을 분량 제한 없이 충분히 길고 깊이 있게 써줘. 문단을 나눠 읽기 편하게 쓰되, 소제목·번호 목록·마크다운 기호(** 등) 없이 일반 글로 작성해줘.`;
+      return `다음은 한 사람의 사주 정보입니다.\n\n${summary}${ctxBlock}${expertGyeokGuidance()}\n\n이 정보를 바탕으로 전문 명리학자가 직접 상담하듯 따뜻하고 구체적인 어조로 "성격과 특징"에 초점을 맞춘 심도 있는 사주풀이를 한국어로 작성해줘. 특히 사주에 나타난 일곱 자리(년간·년지·월간·월지·일지·시간·시지)의 십신을 하나하나 근거로 삼아서, 그 사람의 성격·기질·대인관계 방식·강점과 약점을 구체적으로 풀어줘(예: 어떤 십신이 있어서 어떤 성향이 강하다는 식으로 근거를 짚어줘). 반드시 위에 적힌 출생년도와 현재 나이·인생 시기를 반영해서, 그 나이대에 실제로 해당하는 이야기(예: 10대라면 학업·진로 탐색, 20~30대라면 사회 진출과 자립, 40~50대라면 커리어 성숙과 가정, 60대 이후라면 정리와 안정 등)를 중심으로 풀어줘. 나이와 무관하게 아무에게나 적용될 법한 일반론적인 문장은 피해줘. 타고난 성격과 기질, 강점과 보완하면 좋은 점, 대인관계 스타일, 지금 나이대에 맞는 직업·재물 조언을 분량 제한 없이 충분히 길고 깊이 있게 써줘. 문단을 나눠 읽기 편하게 쓰되, 소제목·번호 목록·마크다운 기호(** 등) 없이 일반 글로 작성해줘.`;
     });
   }
 
@@ -2984,7 +3015,7 @@
         monthLines.push(`${m}월: ${STEM_HANJA[ms.stem]}${BRANCH_HANJA[ms.branch]}(${STEMS[ms.stem]}${BRANCHES[ms.branch]}) — 천간 십신 ${mtg}, 지지 십신 ${mbtg}${relText}`);
       }
       const monthBlock = `\n\n[${nowYear}년 월운(月運) 1~12월 전체]\n${monthLines.join('\n')}`;
-      return `다음은 한 사람의 사주 정보와 ${nowYear}년 세운 정보입니다.\n\n${summary}\n\n${nowYear}년 세운: ${STEM_HANJA[stem]}${BRANCH_HANJA[branch]} (천간 십신: ${tg}, 지지 십신: ${branchTg})${monthBlock}${ctxBlock}\n\n이 정보를 바탕으로 ${nowYear}년 한 해 운세를 구체적으로 한국어로 풀어서 작성해줘. 반드시 위에 적힌 현재 나이·인생 시기와 지금의 대운을 반영해서, 그 나이대의 실제 관심사(학업/취업/결혼/육아/자산관리/건강관리 등 나이에 맞는 주제)에 맞춰 써줘. 나이와 무관한 뻔한 이야기는 피해줘. 먼저 한 해 전체의 큰 흐름(재물운·애정·대인관계운·건강 유의사항)을 짚어준 뒤, 이어서 위에 적힌 1~12월 월운 데이터를 근거로 각 달(또는 흐름이 비슷한 몇 달을 묶어서)마다 그 달의 십신을 근거로 삼아 구체적으로 어떤 기운인지, 무엇을 조심하거나 기대해도 좋을지 월별로 빠짐없이 짚어줘. 분량 제한 없이 충분히 길고 깊이 있게 써줘. 문단을 나눠 읽기 편하게 쓰되, 소제목·번호 목록·마크다운 기호(** 등) 없이 일반 글로 작성해줘.`;
+      return `다음은 한 사람의 사주 정보와 ${nowYear}년 세운 정보입니다.\n\n${summary}\n\n${nowYear}년 세운: ${STEM_HANJA[stem]}${BRANCH_HANJA[branch]} (천간 십신: ${tg}, 지지 십신: ${branchTg})${monthBlock}${ctxBlock}${expertGyeokGuidance()}\n\n이 정보를 바탕으로 ${nowYear}년 한 해 운세를 구체적으로 한국어로 풀어서 작성해줘. 반드시 위에 적힌 현재 나이·인생 시기와 지금의 대운을 반영해서, 그 나이대의 실제 관심사(학업/취업/결혼/육아/자산관리/건강관리 등 나이에 맞는 주제)에 맞춰 써줘. 나이와 무관한 뻔한 이야기는 피해줘. 먼저 한 해 전체의 큰 흐름(재물운·애정·대인관계운·건강 유의사항)을 짚어준 뒤, 이어서 위에 적힌 1~12월 월운 데이터를 근거로 각 달(또는 흐름이 비슷한 몇 달을 묶어서)마다 그 달의 십신을 근거로 삼아 구체적으로 어떤 기운인지, 무엇을 조심하거나 기대해도 좋을지 월별로 빠짐없이 짚어줘. 분량 제한 없이 충분히 길고 깊이 있게 써줘. 문단을 나눠 읽기 편하게 쓰되, 소제목·번호 목록·마크다운 기호(** 등) 없이 일반 글로 작성해줘.`;
     });
   }
 
