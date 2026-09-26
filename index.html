@@ -2648,9 +2648,13 @@
     const panel=document.getElementById('panel-compat');
     panel.innerHTML = `
       <h4>궁합 보기</h4>
-      <p>상대방의 생년월일시(양력)를 입력하면 일간 오행 관계와 띠(년지) 관계로 간단한 궁합을 확인할 수 있습니다.</p>
+      <p>상대방의 생년월일시를 입력하면 일간 오행 관계와 띠(년지) 관계로 간단한 궁합을 확인할 수 있습니다.</p>
       <div class="mini-form">
         <div class="field"><label style="font-size:11px;color:var(--ink-soft);">성별</label><select id="cpGender"><option value="1">남자</option><option value="0">여자</option></select></div>
+        <div class="field" style="flex:0 0 150px;"><label style="font-size:11px;color:var(--ink-soft);">양력 / 음력</label><div class="toggle cal-toggle"><button type="button" id="cpBtnSolar" class="active">양력</button><button type="button" id="cpBtnLunar">음력</button></div></div>
+        <div class="field" style="flex:0 0 84px;"><label style="font-size:11px;color:var(--ink-soft);">&nbsp;</label><button type="button" id="cpBtnLeap" style="width:100%; padding:9px 10px; background:#fffdf7; color:var(--ink); border:1px solid var(--rule); border-radius:8px; font-family:inherit; font-size:14.5px; cursor:pointer;">윤달</button></div>
+      </div>
+      <div class="mini-form">
         <div class="field"><label style="font-size:11px;color:var(--ink-soft);">년</label><select id="cpYear"></select></div>
         <div class="field"><label style="font-size:11px;color:var(--ink-soft);">월</label><select id="cpMonth"></select></div>
         <div class="field"><label style="font-size:11px;color:var(--ink-soft);">일</label><select id="cpDay"></select></div>
@@ -2660,11 +2664,15 @@
         <div class="field"><label style="font-size:11px;color:var(--ink-soft);">분</label><select id="cpMinute"></select></div>
       </div>
       <label class="unknown-time" style="margin-top:-4px;"><input type="checkbox" id="cpUnknown"> 상대방 태어난 시간을 모릅니다</label>
+      <div class="error-box" id="cpErrorBox"></div>
       <button class="go-btn" id="cpGo" style="margin-bottom:14px;">궁합 보기</button>
       <div id="cpResult"></div>
     `;
     const cpYear=document.getElementById('cpYear'), cpMonth=document.getElementById('cpMonth'), cpDay=document.getElementById('cpDay');
     const cpHour=document.getElementById('cpHour'), cpMinute=document.getElementById('cpMinute'), cpUnknown=document.getElementById('cpUnknown');
+    const cpBtnSolar=document.getElementById('cpBtnSolar'), cpBtnLunar=document.getElementById('cpBtnLunar'), cpBtnLeap=document.getElementById('cpBtnLeap');
+    const cpErrorBox=document.getElementById('cpErrorBox');
+    let cpCalType='solar', cpIsLeapMonth=false;
     const ty=new Date().getFullYear();
     for(let y=ty;y>=1930;y--){ const o=document.createElement('option'); o.value=y; o.textContent=y+'년'; if(y===2000)o.selected=true; cpYear.appendChild(o); }
     for(let m=1;m<=12;m++){ const o=document.createElement('option'); o.value=m; o.textContent=m+'월'; cpMonth.appendChild(o); }
@@ -2672,18 +2680,49 @@
     for(let mi=0;mi<60;mi++){ const o=document.createElement('option'); o.value=mi; o.textContent=String(mi).padStart(2,'0')+'분'; cpMinute.appendChild(o); }
     function fillCpDays(){
       const cur=cpDay.value; cpDay.innerHTML='';
-      const days=new Date(+cpYear.value, +cpMonth.value, 0).getDate();
+      let days=30;
+      if(cpCalType==='solar'){ days=new Date(+cpYear.value, +cpMonth.value, 0).getDate(); }
       for(let d=1;d<=days;d++){ const o=document.createElement('option'); o.value=d; o.textContent=d+'일'; cpDay.appendChild(o); }
       if(cur && +cur<=days) cpDay.value=cur;
     }
-    fillCpDays(); cpYear.addEventListener('change',fillCpDays); cpMonth.addEventListener('change',fillCpDays);
+    function updateCpLeapBtnStyle(){
+      if(cpCalType==='lunar'){
+        cpBtnLeap.disabled=false; cpBtnLeap.style.cursor='pointer';
+        if(cpIsLeapMonth){ cpBtnLeap.style.background='var(--seal)'; cpBtnLeap.style.color='#fff7ee'; cpBtnLeap.style.borderColor='var(--seal)'; }
+        else { cpBtnLeap.style.background='#fffdf7'; cpBtnLeap.style.color='var(--ink)'; cpBtnLeap.style.borderColor='var(--rule)'; }
+      } else {
+        cpBtnLeap.disabled=true; cpBtnLeap.style.cursor='not-allowed';
+        cpBtnLeap.style.background='#fffdf7'; cpBtnLeap.style.color='var(--ink-soft)'; cpBtnLeap.style.borderColor='var(--rule)';
+      }
+    }
+    fillCpDays(); updateCpLeapBtnStyle();
+    cpYear.addEventListener('change',fillCpDays); cpMonth.addEventListener('change',fillCpDays);
+    cpBtnSolar.addEventListener('click',()=>{
+      cpCalType='solar'; cpBtnSolar.classList.add('active'); cpBtnLunar.classList.remove('active');
+      cpIsLeapMonth=false; updateCpLeapBtnStyle(); fillCpDays();
+    });
+    cpBtnLunar.addEventListener('click',()=>{
+      cpCalType='lunar'; cpBtnLunar.classList.add('active'); cpBtnSolar.classList.remove('active');
+      updateCpLeapBtnStyle(); fillCpDays();
+    });
+    cpBtnLeap.addEventListener('click',()=>{
+      if(cpBtnLeap.disabled) return;
+      cpIsLeapMonth=!cpIsLeapMonth; updateCpLeapBtnStyle();
+    });
     cpUnknown.addEventListener('change',()=>{
       const on=cpUnknown.checked; cpHour.disabled=on; cpMinute.disabled=on;
       cpHour.style.opacity=on?0.4:1; cpMinute.style.opacity=on?0.4:1;
     });
 
     document.getElementById('cpGo').addEventListener('click',()=>{
-      const py=+cpYear.value, pm=+cpMonth.value, pd=+cpDay.value, pIsMale=document.getElementById('cpGender').value==='1';
+      cpErrorBox.classList.remove('show'); cpErrorBox.textContent='';
+      const inPy=+cpYear.value, inPm=+cpMonth.value, inPd=+cpDay.value, pIsMale=document.getElementById('cpGender').value==='1';
+      let py=inPy, pm=inPm, pd=inPd;
+      if(cpCalType==='lunar'){
+        const conv=lunarToSolar(inPy, inPm, cpIsLeapMonth, inPd);
+        if(conv.error){ cpErrorBox.textContent=conv.error; cpErrorBox.classList.add('show'); return; }
+        py=conv.year; pm=conv.month; pd=conv.day;
+      }
       const pHasTime=!cpUnknown.checked, pHour=pHasTime?+cpHour.value:12, pMinute=pHasTime?+cpMinute.value:0;
       const p=computeSaju(py,pm,pd,pHour,pMinute,pHasTime,true);
       const {s, dayStemIdx}=state;
