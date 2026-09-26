@@ -810,30 +810,95 @@
   }
 
   // ---- 격국(格局) — 자평진전 기준 다수설을 간략화한 참고용 판정 (내격 10격만, 파격·외격은 가능성만 안내) ----
+  // 월률분야(月律分野): 절입 후 며칠 지났는지로 월지 지장간 중 실제 "당령(사령)"인 글자를 판정
+  function monthRuleDays(branch){
+    if([2,8,5,11].includes(branch)) return [7,7,16]; // 생지(인신사해)
+    if(branch===6) return [10,10,10]; // 오(예외: 병·기·정 3분할)
+    if([0,3,9].includes(branch)) return [10,20]; // 왕지(자묘유, 오 제외)
+    if([4,10,1,7].includes(branch)) return [9,3,18]; // 고지(진술축미)
+    return null;
+  }
+  function sajeongForMonth(s){
+    const mb=s.month.branch, hiddenHanja=HIDDEN[mb], days=monthRuleDays(mb);
+    if(!days || s.termIndex===undefined || s.birthJD_UT===undefined) return { idx: hiddenHanja.length-1, elapsedDays:null };
+    const currentLon=mod(315+30*s.termIndex,360), curTermJD=solarTermJD(currentLon, s.birthJD_UT);
+    let elapsed=s.birthJD_UT-curTermJD; if(elapsed<0) elapsed=0;
+    let cum=0, idx=hiddenHanja.length-1;
+    for(let i=0;i<days.length;i++){ cum+=days[i]; if(elapsed<cum){ idx=i; break; } }
+    return { idx, elapsedDays: Math.round(elapsed) };
+  }
+  // 통근(通根)·투출(透出): 천간이 지지 지장간에 뿌리를 내렸는지 / 지장간이 다른 자리 천간에 드러났는지
+  function analyzeTonggeunTuchul(s){
+    const stems=[{idx:s.year.stem,label:'년간'},{idx:s.month.stem,label:'월간'},{idx:s.day.stem,label:'일간'}];
+    if(s.hour) stems.push({idx:s.hour.stem,label:'시간'});
+    const branches=[{idx:s.year.branch,label:'년지'},{idx:s.month.branch,label:'월지'},{idx:s.day.branch,label:'일지'}];
+    if(s.hour) branches.push({idx:s.hour.branch,label:'시지'});
+    const tonggeun=stems.map(st=>{
+      const roots=[];
+      branches.forEach(br=>{
+        const hidden=HIDDEN[br.idx];
+        hidden.forEach((h,i)=>{
+          const hIdx=STEM_HANJA.indexOf(h);
+          if(STEM_ELEM[hIdx]===STEM_ELEM[st.idx]){
+            const phase = hidden.length===3 ? ['여기','중기','정기'][i] : ['여기','정기'][i];
+            roots.push({branchLabel:br.label, phase, exact:hIdx===st.idx});
+          }
+        });
+      });
+      return {...st, roots};
+    });
+    const tuchul=branches.map(br=>{
+      const hidden=HIDDEN[br.idx], outs=[];
+      hidden.forEach((h,i)=>{
+        const hIdx=STEM_HANJA.indexOf(h);
+        const positions=stems.filter(st=>st.idx===hIdx).map(st=>st.label);
+        if(positions.length){
+          const phase = hidden.length===3 ? ['여기','중기','정기'][i] : ['여기','정기'][i];
+          outs.push({stemHanja:h, phase, positions});
+        }
+      });
+      return {...br, outs};
+    });
+    return {tonggeun, tuchul};
+  }
+
+  function gyeokFeedbackNote(gyeok, combinedRels, dynamicLabel){
+    if(!gyeok.gyeokName || !gyeok.investoutLabels || !gyeok.investoutLabels.length) return '';
+    const hits=combinedRels.filter(r=>(r.type==='천간합'||r.type==='천간충') && r.pair.includes(dynamicLabel) && r.pair.some(p=>gyeok.investoutLabels.includes(p)));
+    if(!hits.length) return '';
+    return `이 시기에는 격국(${gyeok.gyeokName})을 정한 글자가 ${dynamicLabel}과 ${hits.map(r=>r.type).join('·')} 관계가 되어, 격의 성격이 흔들리거나 다른 기운으로 바뀔 수 있는 시기입니다.`;
+  }
+
   function determineGyeokguk(s, dayStemIdx, strengthRatio){
     if(strengthRatio!==undefined && (strengthRatio<=0.15 || strengthRatio>=0.85)){
       return { gyeokName:null, warning:'외격', note:`억부 비율이 매우 극단적(지지력 약 ${Math.round(strengthRatio*100)}%)이라 종격 등 외격 후보로 보이며, 일반적인 내격 판정을 적용하기 어렵습니다.` };
     }
     const mb=s.month.branch;
     const hiddenIdx=HIDDEN[mb].map(h=>STEM_HANJA.indexOf(h)); // [여기, (중기), 정기] 순
+    const phaseNames = hiddenIdx.length===3 ? ['여기','중기','정기'] : ['여기','정기'];
     const fullStemList=[{idx:s.year.stem,label:'년간'},{idx:s.month.stem,label:'월간'},{idx:s.day.stem,label:'일간'}];
     if(s.hour) fullStemList.push({idx:s.hour.stem,label:'시간'});
     const stemsToCheck=fullStemList.filter(x=>x.label!=='일간').map(x=>x.idx);
-    const jeongiStem=hiddenIdx[hiddenIdx.length-1];
     const tgOf=(stemIdx)=> tenGod(dayStemIdx, STEM_ELEM[stemIdx], stemIdx%2===0);
-    const jeongiTg=tgOf(jeongiStem);
+    const sajeong=sajeongForMonth(s);
+    const sajeongStem=hiddenIdx[sajeong.idx], sajeongPhase=phaseNames[sajeong.idx];
+    const sajeongTg=tgOf(sajeongStem);
     let chosenStem=null, chosenTg=null, note='';
-    if(jeongiTg!=='비견' && jeongiTg!=='겁재'){
-      chosenStem=jeongiStem; chosenTg=jeongiTg;
-      note = stemsToCheck.includes(jeongiStem) ? '월지 정기가 천간에 투출' : '월지 정기 기준(미투출)';
+    if(sajeongTg!=='비견' && sajeongTg!=='겁재'){
+      chosenStem=sajeongStem; chosenTg=sajeongTg;
+      const investoutNote = stemsToCheck.includes(sajeongStem) ? '천간에 투출' : '미투출';
+      note = sajeong.elapsedDays!==null
+        ? `월지 당령(${sajeongPhase}, 절입 후 약 ${sajeong.elapsedDays}일째)이 ${investoutNote}`
+        : `월지 ${sajeongPhase} 기준(${investoutNote})`;
     } else {
-      // 정기가 비겁이면, 중기·여기 중 투출한 다른 글자를 우선 확인
-      for(let i=hiddenIdx.length-2;i>=0;i--){
-        const st=hiddenIdx[i], tg=tgOf(st);
-        if((tg!=='비견'&&tg!=='겁재') && stemsToCheck.includes(st)){ chosenStem=st; chosenTg=tg; note='월지 중기/여기가 천간에 투출'; break; }
+      // 당령 글자가 비겁이면, 나머지 지장간 중 천간에 투출한 다른 글자를 우선 확인
+      const others=hiddenIdx.map((st,i)=>({st,i})).filter(o=>o.i!==sajeong.idx);
+      for(const o of others){
+        const tg=tgOf(o.st);
+        if((tg!=='비견'&&tg!=='겁재') && stemsToCheck.includes(o.st)){ chosenStem=o.st; chosenTg=tg; note=`당령(${sajeongPhase})이 비겁이라, 대신 월지 ${phaseNames[o.i]}가 천간에 투출한 것을 격으로 삼음`; break; }
       }
       if(chosenStem===null){
-        return { gyeokName: (jeongiTg==='겁재'?'양인격':'건록격'), note:'월지가 비겁(比劫)이라 별도 명명' };
+        return { gyeokName: (sajeongTg==='겁재'?'양인격':'건록격'), note:`월지 당령(${sajeongPhase})이 비겁(比劫)이라 별도 명명` };
       }
     }
     // 파격(破格) 가능성: 격을 정한 글자가 실제로 투출된 경우, 다른 천간과 합·충이 되는지 확인
@@ -841,10 +906,10 @@
     if(investoutLabels.length){
       const broken=detectStemRelations(fullStemList).filter(r=>(r.type==='천간합'||r.type==='천간충') && r.pair.some(p=>investoutLabels.includes(p)));
       if(broken.length){
-        return { gyeokName: chosenTg+'격', warning:'파격', note:`격을 정한 글자가 ${broken.map(r=>`${r.pair.join('-')} ${r.type}`).join(', ')} 관계라 파격(破格) 가능성이 있습니다.` };
+        return { gyeokName: chosenTg+'격', warning:'파격', note:`격을 정한 글자가 ${broken.map(r=>`${r.pair.join('-')} ${r.type}`).join(', ')} 관계라 파격(破格) 가능성이 있습니다.`, chosenStem, investoutLabels };
       }
     }
-    return { gyeokName: chosenTg+'격', note };
+    return { gyeokName: chosenTg+'격', note, chosenStem, investoutLabels };
   }
 
   const SIXHAP_P=[[0,1],[2,11],[3,10],[4,9],[5,8],[6,7]];
@@ -1392,13 +1457,16 @@
     const gongmang=gongmangBranches(s.day.stem, s.day.branch);
     const sinsalMap=twelveSinsalMap(s.year.branch);
     const gwiinMap=detectGwiinBranches(s);
-    const mkExtra=(branch)=>({ isGongmang: gongmang.includes(branch), sinsal: sinsalMap[branch], gwiin: gwiinMap[branch] });
+    const tt=analyzeTonggeunTuchul(s);
+    const tonggeunByLabel={};
+    tt.tonggeun.forEach(st=>{ tonggeunByLabel[st.label] = st.roots.length ? `통근(${st.roots.map(r=>r.branchLabel.replace(/지$/,'')).join('·')})` : null; });
+    const mkExtra=(branch, stemLabel)=>({ isGongmang: gongmang.includes(branch), sinsal: sinsalMap[branch], gwiin: gwiinMap[branch], tonggeun: stemLabel?tonggeunByLabel[stemLabel]:null });
     let html='';
     extra.forEach(c=>{ html+=pillarHTML(c.tag, c.part, dayStemIdx, false, true, 'extra-col'); });
-    html+=pillarHTML('시주 · 時柱', s.hour, dayStemIdx, false, hasTime, undefined, s.hour?mkExtra(s.hour.branch):undefined);
-    html+=pillarHTML('일주 · 日柱', s.day, dayStemIdx, true, true, undefined, mkExtra(s.day.branch));
-    html+=pillarHTML('월주 · 月柱', s.month, dayStemIdx, false, true, undefined, mkExtra(s.month.branch));
-    html+=pillarHTML('년주 · 年柱', s.year, dayStemIdx, false, true, undefined, mkExtra(s.year.branch));
+    html+=pillarHTML('시주 · 時柱', s.hour, dayStemIdx, false, hasTime, undefined, s.hour?mkExtra(s.hour.branch,'시간'):undefined);
+    html+=pillarHTML('일주 · 日柱', s.day, dayStemIdx, true, true, undefined, mkExtra(s.day.branch,'일간'));
+    html+=pillarHTML('월주 · 月柱', s.month, dayStemIdx, false, true, undefined, mkExtra(s.month.branch,'월간'));
+    html+=pillarHTML('년주 · 年柱', s.year, dayStemIdx, false, true, undefined, mkExtra(s.year.branch,'년간'));
     const pillarsEl=document.getElementById('pillars');
     pillarsEl.innerHTML=html;
     pillarsEl.style.gridTemplateColumns=`repeat(${extra.length+4},1fr)`;
@@ -1487,11 +1555,13 @@
     const gongmangHtml = extra && extra.isGongmang ? `<div class="gongmang-badge" style="margin-top:-4px;color:var(--seal);font-size:10.5px;">空亡</div>` : '';
     const sinsalHtml = extra && extra.sinsal ? `<div class="sinsal12-tag" style="margin-top:2px;font-size:11px;color:var(--ink-soft);">${extra.sinsal}</div>` : '';
     const gwiinHtml = extra && extra.gwiin && extra.gwiin.length ? `<div class="gwiin-tag" style="margin-top:2px;font-size:10.5px;color:var(--gold);">${extra.gwiin.join('·')}</div>` : '';
+    const tonggeunHtml = extra && extra.tonggeun ? `<div class="tonggeun-tag" style="font-size:10px;color:var(--ink-soft);margin-top:-2px;">${extra.tonggeun}</div>` : '';
     return `<div class="pillar${extraClass?' '+extraClass:''}">
         <div class="tag">${tag}</div>
         ${stemTGHtml}
         ${stemGlyphHtml}
         <div class="hangeul">${STEMS[part.stem]} · ${sElem} · ${stemYang?'陽':'陰'}</div>
+        ${tonggeunHtml}
         ${isDayStem?'<div class="ilgan-note">일간(나) · 클릭해서 자세히 보기</div>':''}
         <div class="divider"></div>
         ${branchTGHtml}
@@ -1757,6 +1827,14 @@
     } else {
       lines.push(`격국(참고, 간략화된 판정 — 파격·외격·종격은 별도 표시): ${gyeok.gyeokName} (${gyeok.note})`);
     }
+
+    const tt=analyzeTonggeunTuchul(s);
+    const tonggeunLines=tt.tonggeun.map(st=>{
+      if(!st.roots.length) return `${st.label}(${STEM_HANJA[st.idx]}): 통근 없음`;
+      const rootDesc=st.roots.map(r=>`${r.branchLabel}${r.exact?'(정확히 같은 글자)':''}[${r.phase}]`).join(', ');
+      return `${st.label}(${STEM_HANJA[st.idx]}): 통근 있음 — ${rootDesc}`;
+    });
+    lines.push('통근(通根, 천간이 지지 지장간에 뿌리내렸는지):\n' + tonggeunLines.map(l=>'  · '+l).join('\n'));
 
     // ---- 대운·세운·월운이 원국과 만나는 합·충·형·해를 앱이 직접 계산해서 AI에 전달 ----
     const ganji=(st,br)=>`${STEM_HANJA[st]}${BRANCH_HANJA[br]}(${STEMS[st]}${BRANCHES[br]})`;
@@ -2656,6 +2734,8 @@
       ? '<p style="font-size:12.5px;color:var(--ink-soft);">원국과 이 대운 사이에 특별히 두드러진 형충회합 관계는 나타나지 않았습니다.</p>'
       : combinedRels.map(relItemHTML).join('');
     const stageHTML = branchList.map(b=>{ const st=twelveStage(dayStemIdx,b.idx); return `<div class="rel-item stage-btn" data-stage="${st}" style="display:inline-block;margin-right:6px;cursor:pointer;"><b>${b.label}</b> ${BRANCH_HANJA[b.idx]}(${BRANCHES[b.idx]}) — 십이운성 <b style="color:var(--gold);">${st}</b></div>`; }).join('');
+    const gyeok=determineGyeokguk(s, dayStemIdx, assessStrength(s, dayStemIdx).ratio);
+    const gyeokNote=gyeokFeedbackNote(gyeok, combinedRels, '대운간');
 
     document.getElementById('panel-daewoon').innerHTML = `
       <h4>${item.label} · 만 ${item.ageFrom}~${item.ageTo}세 풀이</h4>
@@ -2663,6 +2743,7 @@
       <p>${TENGOD_DESC[tgStem]}</p>
       <p>${TENGOD_DESC[tgBranch]}</p>
       <p>${gyDesc}</p>
+      ${gyeokNote?`<p style="color:var(--seal);">${gyeokNote}</p>`:''}
       <h5>원국 + 대운 형충회합 (刑沖會合)</h5>
       ${combinedRelHTML}
       <h5>원국 + 대운 십이운성 (十二運星)</h5>
@@ -2677,7 +2758,8 @@
       const ctx = (document.getElementById('ctxShared').value||'').trim();
       const ctxBlock = ctx ? `\n\n[질문자가 알려준 현재 상황]\n${ctx}\n\n위 상황은 질문자가 직접 알려준 사실이니 이것만 참고하고, 확인되지 않은 사실을 새로 지어내지 마.` : '';
       const relBlock = combinedRels.length ? `\n원국+대운 형충회합: ${combinedRels.map(r=>`${r.pair.join('-')} ${r.type}`).join(', ')}` : '';
-      return `다음은 한 사람의 사주 정보입니다.\n\n${summary}${relBlock}${ctxBlock}\n\n이 사람의 "${item.label}"(만 나이 약 ${item.ageFrom}~${item.ageTo}세, 대운 간지 ${STEM_HANJA[item.stem]}${BRANCH_HANJA[item.branch]}, 천간 십신 ${tgStem}, 지지 십신 ${tgBranch}, 십이운성 ${stage}, 용신 기준 ${gyText})에 대해 구체적으로 풀이해줘. 원국과 이 대운 사이의 형충회합 관계도 참고해줘. 이 시기에 예상되는 직업·재물·건강·대인관계 흐름을 중심으로, 두루뭉술하게 얼버무리지 말고 명확한 어조로 결론부터 제시한 뒤 근거를 설명해줘. 분량 제한 없이 충분히 길고 깊이 있게 한국어로 써줘. 문단을 나눠 읽기 편하게 쓰되, 소제목·번호 목록·마크다운 기호(** 등) 없이 일반 글로 작성해줘.`;
+      const gyeokBlock = gyeokNote ? `\n${gyeokNote}` : '';
+      return `다음은 한 사람의 사주 정보입니다.\n\n${summary}${relBlock}${gyeokBlock}${ctxBlock}\n\n이 사람의 "${item.label}"(만 나이 약 ${item.ageFrom}~${item.ageTo}세, 대운 간지 ${STEM_HANJA[item.stem]}${BRANCH_HANJA[item.branch]}, 천간 십신 ${tgStem}, 지지 십신 ${tgBranch}, 십이운성 ${stage}, 용신 기준 ${gyText})에 대해 구체적으로 풀이해줘. 원국과 이 대운 사이의 형충회합 관계도 참고해줘. 이 시기에 예상되는 직업·재물·건강·대인관계 흐름을 중심으로, 두루뭉술하게 얼버무리지 말고 명확한 어조로 결론부터 제시한 뒤 근거를 설명해줘. 분량 제한 없이 충분히 길고 깊이 있게 한국어로 써줘. 문단을 나눠 읽기 편하게 쓰되, 소제목·번호 목록·마크다운 기호(** 등) 없이 일반 글로 작성해줘.`;
     });
   }
 
@@ -2729,6 +2811,8 @@
       ? '<p style="font-size:12.5px;color:var(--ink-soft);">원국과 이 세운 사이에 특별히 두드러진 형충회합 관계는 나타나지 않았습니다.</p>'
       : combinedRels.map(relItemHTML).join('');
     const stageHTML = branchList.map(b=>{ const st=twelveStage(dayStemIdx,b.idx); return `<div class="rel-item stage-btn" data-stage="${st}" style="display:inline-block;margin-right:6px;cursor:pointer;"><b>${b.label}</b> ${BRANCH_HANJA[b.idx]}(${BRANCHES[b.idx]}) — 십이운성 <b style="color:var(--gold);">${st}</b></div>`; }).join('');
+    const gyeok=determineGyeokguk(s, dayStemIdx, assessStrength(s, dayStemIdx).ratio);
+    const gyeokNote=gyeokFeedbackNote(gyeok, combinedRels, '세운간');
 
     document.getElementById('panel-sewoon').innerHTML = `
       <h4>${yy}년 세운 풀이</h4>
@@ -2736,6 +2820,7 @@
       <p>${TENGOD_DESC[tgStem]}</p>
       <p>${TENGOD_DESC[tgBranch]}</p>
       <p>${gyDesc}</p>
+      ${gyeokNote?`<p style="color:var(--seal);">${gyeokNote}</p>`:''}
       <h5>원국 + 세운 형충회합 (刑沖會合)</h5>
       ${combinedRelHTML}
       <h5>원국 + 세운 십이운성 (十二運星)</h5>
@@ -2750,7 +2835,8 @@
       const ctx = (document.getElementById('ctxShared').value||'').trim();
       const ctxBlock = ctx ? `\n\n[질문자가 알려준 현재 상황]\n${ctx}\n\n위 상황은 질문자가 직접 알려준 사실이니 이것만 참고하고, 확인되지 않은 사실을 새로 지어내지 마.` : '';
       const relBlock = combinedRels.length ? `\n원국+세운 형충회합: ${combinedRels.map(r=>`${r.pair.join('-')} ${r.type}`).join(', ')}` : '';
-      return `다음은 한 사람의 사주 정보입니다.\n\n${summary}${relBlock}${ctxBlock}\n\n이 사람의 ${yy}년 세운(간지 ${STEM_HANJA[stem]}${BRANCH_HANJA[branch]}, 천간 십신 ${tgStem}, 지지 십신 ${tgBranch}, 십이운성 ${stage}, 용신 기준 ${gyText})에 대해 구체적으로 풀이해줘. 원국과 이 세운 사이의 형충회합 관계도 참고해줘. 이 해에 예상되는 직업·재물·건강·대인관계 흐름을 상반기/하반기로 나누어, 두루뭉술하게 얼버무리지 말고 명확한 어조로 결론부터 제시한 뒤 근거를 설명해줘. 분량 제한 없이 충분히 길고 깊이 있게 한국어로 써줘. 문단을 나눠 읽기 편하게 쓰되, 소제목·번호 목록·마크다운 기호(** 등) 없이 일반 글로 작성해줘.`;
+      const gyeokBlock = gyeokNote ? `\n${gyeokNote}` : '';
+      return `다음은 한 사람의 사주 정보입니다.\n\n${summary}${relBlock}${gyeokBlock}${ctxBlock}\n\n이 사람의 ${yy}년 세운(간지 ${STEM_HANJA[stem]}${BRANCH_HANJA[branch]}, 천간 십신 ${tgStem}, 지지 십신 ${tgBranch}, 십이운성 ${stage}, 용신 기준 ${gyText})에 대해 구체적으로 풀이해줘. 원국과 이 세운 사이의 형충회합 관계도 참고해줘. 이 해에 예상되는 직업·재물·건강·대인관계 흐름을 상반기/하반기로 나누어, 두루뭉술하게 얼버무리지 말고 명확한 어조로 결론부터 제시한 뒤 근거를 설명해줘. 분량 제한 없이 충분히 길고 깊이 있게 한국어로 써줘. 문단을 나눠 읽기 편하게 쓰되, 소제목·번호 목록·마크다운 기호(** 등) 없이 일반 글로 작성해줘.`;
     });
   }
 
