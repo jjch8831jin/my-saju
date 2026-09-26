@@ -812,6 +812,13 @@
   const SIXHAP_P=[[0,1],[2,11],[3,10],[4,9],[5,8],[6,7]];
   const CHUNG_P=[[0,6],[1,7],[2,8],[3,9],[4,10],[5,11]];
   const HAE_P=[[0,7],[1,6],[2,5],[3,4],[8,11],[9,10]];
+  const WONJIN_P=[[0,7],[1,6],[2,9],[3,8],[4,11],[5,10]]; // 원진: 자미·축오·인유·묘신·진해·사술
+  const BANGHAP_GROUPS=[[11,0,1],[2,3,4],[5,6,7],[8,9,10]]; // 해자축·인묘진·사오미·신유술 (계절 순서대로)
+  function gosinGwasukForBranch(branch){
+    const g=BANGHAP_GROUPS.find(g=>g.includes(branch));
+    if(!g) return null;
+    return { gosin: mod(g[g.length-1]+1,12), gwasuk: mod(g[0]-1,12) }; // 고신: 그룹 다음 글자, 과숙: 그룹 앞 글자
+  }
   const SAMHAP_GROUPS=[{name:'화국',elem:'화',set:[2,6,10]},{name:'금국',elem:'금',set:[5,9,1]},{name:'수국',elem:'수',set:[8,0,4]},{name:'목국',elem:'목',set:[11,3,7]}];
   const STEM_HAP_P=[[0,5,'토'],[1,6,'금'],[2,7,'수'],[3,8,'목'],[4,9,'화']]; // 갑기합토·을경합금·병신합수·정임합목·무계합화
   const STEM_CHUNG_P=[[0,6],[1,7],[2,8],[3,9]]; // 갑경충·을신충·병임충·정계충
@@ -2264,7 +2271,7 @@
       if(tab==='reading') renderReading();
       else if(tab==='compat') renderCompatForm();
       else if(tab==='fortune') renderFortune();
-      else if(tab==='wedding') renderDateList('wedding');
+      else if(tab==='wedding') renderWeddingForm();
       else if(tab==='moving') renderDateList('moving');
       else if(tab==='prayer') renderDateList('prayer');
       else if(tab==='zodiac') renderZodiac();
@@ -2966,11 +2973,7 @@
   function renderDateList(kind){
     const {s, ys} = state;
     let title, desc, filterFn, limit=8;
-    if(kind==='wedding'){
-      title='결혼택일'; desc='내 일지(日支)와 육합(六合) 관계를 이루는 지지의 날을 우선 추천합니다. (60일 이내, 간단 참고용)';
-      const myBranch=s.day.branch;
-      filterFn=(info)=> hasPair(SIXHAP_P,myBranch,info.dBranch) ? '일지 육합' : null;
-    } else if(kind==='moving'){
+    if(kind==='moving'){
       title='이사택일';
       const td=new Date(), tyB=yearBranchForDate(td.getFullYear(), td.getMonth()+1, td.getDate());
       const djDir=dirForYearBranch(DAEJANGGUN_GROUPS,tyB), ssDir=dirForYearBranch(SAMSAL_GROUPS,tyB);
@@ -3039,6 +3042,212 @@
       }).join('')+'</div>';
     }
     document.getElementById('panel-'+kind).innerHTML = html;
+  }
+
+  // ---- 결혼택일: 본인 기준 / 두 사람(본인+상대방) 기준을 구별해서 선택 ----
+  function buildWeddingFilterFn(refs){
+    const exclSets = refs.map(r=>{
+      const gg = gosinGwasukForBranch(r.yearBranch) || {gosin:null,gwasuk:null};
+      return { dayBranch:r.dayBranch, ys:r.ys, gosin:gg.gosin, gwasuk:gg.gwasuk };
+    });
+    const two = refs.length>1;
+    return (info)=>{
+      for(const ex of exclSets){
+        if(hasPair(CHUNG_P, ex.dayBranch, info.dBranch)) return null;
+        if(hasPair(HAE_P, ex.dayBranch, info.dBranch)) return null;
+        if(hasPair(WONJIN_P, ex.dayBranch, info.dBranch)) return null;
+        if(ex.dayBranch===info.dBranch && [4,6,9,11].includes(info.dBranch)) return null;
+        if((ex.dayBranch===0&&info.dBranch===3)||(ex.dayBranch===3&&info.dBranch===0)) return null;
+        if(info.dBranch===ex.gosin || info.dBranch===ex.gwasuk) return null;
+      }
+      const reasons=[]; let score=0;
+      exclSets.forEach((ex,i)=>{
+        const who = two ? (i===0?'나의 ':'상대방의 ') : '';
+        if(hasPair(SIXHAP_P, ex.dayBranch, info.dBranch)){ reasons.push(`${who}일지와 육합(六合)이 되는 날`); score+=1; return; }
+        const g = SAMHAP_GROUPS.find(g=> g.set.includes(ex.dayBranch) && g.set.includes(info.dBranch) && ex.dayBranch!==info.dBranch);
+        if(g){ reasons.push(`${who}일지와 삼합(${g.name}) 관계가 되는 날`); score+=1; }
+      });
+      const ld=info.lunar.day;
+      if(ld%10===9 || ld%10===0){ reasons.push(`손 없는 날(음력 ${ld}일)`); score+=1; }
+      const mB=monthBranchForDate(info.y, info.m, info.day), gIdx=mod(info.dBranch-mB,12), gName=GEONJE_NAMES[gIdx];
+      if(GEONJE_GOOD_MOVING.includes(gName)){ reasons.push(`건제법상 ${gName}일(${GEONJE_HANJA[gName]}日)`); score+=1; }
+      exclSets.forEach((ex,i)=>{
+        if(!ex.ys) return;
+        const who = two ? (i===0?'나의 ':'상대방의 ') : '본인 사주의 ';
+        const elem=STEM_ELEM[info.dStem];
+        if(elem===ex.ys.yong){ reasons.push(`${who}용신인 ${elem}(${ELEM_HANJA_MAP[elem]}) 기운의 날`); score+=1; }
+        else if(elem===ex.ys.hui){ reasons.push(`${who}희신인 ${elem}(${ELEM_HANJA_MAP[elem]}) 기운의 날`); score+=0.5; }
+      });
+      if(reasons.length===0) return null;
+      return {tag: `${reasons.length}가지 조건 충족`, score, reasons};
+    };
+  }
+  function renderWeddingResult(partner){
+    const {s, ys} = state;
+    const refs=[{yearBranch:s.year.branch, dayBranch:s.day.branch, ys}];
+    if(partner) refs.push({yearBranch:partner.s.year.branch, dayBranch:partner.s.day.branch, ys:partner.ys});
+    let list=scanUpcoming(90, buildWeddingFilterFn(refs));
+    list = list.map(item=>({...item, great:item.score>=2}))
+               .sort((a,b)=> (b.score-a.score) || (new Date(a.y,a.m-1,a.day)-new Date(b.y,b.m-1,b.day)))
+               .slice(0,8);
+    let html='';
+    if(list.length===0){ html='<p>앞으로 90일 이내에 조건에 맞는 날짜를 찾지 못했습니다.</p>'; }
+    else {
+      html='<div class="date-list">'+list.map(item=>{
+        const gz=STEM_HANJA[item.dStem]+BRANCH_HANJA[item.dBranch];
+        const boxStyle=(item.great?'background:rgba(43,58,103,0.08);border-color:rgba(43,58,103,0.4);':'')+'display:block;';
+        const tagStyle= item.great? ' style="color:#2b3a67;"':'';
+        const headLine=`${item.y}.${item.m}.${item.day} (${item.weekday})${item.isToday?' 오늘':''} · 일진 ${gz} · 음력 ${item.lunar.month}${item.lunar.isLeap?'(윤)':''}.${item.lunar.day}`;
+        const expl = item.reasons.join('이고, ') + `이라서${item.great?' 특히':''} 좋은 날로 골랐습니다.`;
+        return `<div class="date-item" style="${boxStyle}"><div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:6px;"><span>${headLine}</span><span class="dtag"${tagStyle}>${item.tag}</span></div><div style="font-size:11.5px;color:var(--ink-soft);margin-top:4px;line-height:1.5;">${expl}</div></div>`;
+      }).join('')+'</div>';
+    }
+    document.getElementById('weddingResult').innerHTML = html;
+  }
+  function renderWeddingForm(){
+    const panel=document.getElementById('panel-wedding');
+    panel.innerHTML = `
+      <h4>결혼택일</h4>
+      <p>내 일지와 육합·삼합이 되는 날은 선호하고, 충·해(六害)·원진·형(자형·상형)·고신/과숙에 걸리는 날은 후보에서 제외하면서, 손 없는 날·황도길일(건제법)·용신/희신에 맞는 날까지 점수로 매겨 좋은 날부터 보여드립니다. 음양부장길일·가취월(혼인기피월)은 정확한 원전 표를 확인하지 못해 이번엔 반영하지 않았습니다. 전통 택일법은 유파마다 세부 기준이 달라 참고용으로만 봐주세요.</p>
+      <div class="mini-form">
+        <div class="field" style="flex:0 0 220px;">
+          <label style="font-size:11px;color:var(--ink-soft);">기준</label>
+          <div class="toggle cal-toggle"><button type="button" id="wdModeSelf" class="active">본인 기준</button><button type="button" id="wdModeBoth">두 사람 기준</button></div>
+        </div>
+      </div>
+      <div id="wdPartnerForm" style="display:none;">
+        <div class="mini-form">
+          <div class="field"><label style="font-size:11px;color:var(--ink-soft);">상대방 성별</label><select id="wdGender"><option value="1">남자</option><option value="0">여자</option></select></div>
+          <div class="field" style="flex:0 0 150px;"><label style="font-size:11px;color:var(--ink-soft);">양력 / 음력</label><div class="toggle cal-toggle"><button type="button" id="wdBtnSolar" class="active">양력</button><button type="button" id="wdBtnLunar">음력</button></div></div>
+          <div class="field" style="flex:0 0 84px;"><label style="font-size:11px;color:var(--ink-soft);">&nbsp;</label><button type="button" id="wdBtnLeap" style="width:100%; padding:9px 10px; background:#fffdf7; color:var(--ink); border:1px solid var(--rule); border-radius:8px; font-family:inherit; font-size:14.5px; cursor:pointer;">윤달</button></div>
+        </div>
+        <div class="mini-form">
+          <div class="field"><label style="font-size:11px;color:var(--ink-soft);">년</label><select id="wdYear"></select></div>
+          <div class="field"><label style="font-size:11px;color:var(--ink-soft);">월</label><select id="wdMonth"></select></div>
+          <div class="field"><label style="font-size:11px;color:var(--ink-soft);">일</label><select id="wdDay"></select></div>
+        </div>
+        <div class="mini-form">
+          <div class="field"><label style="font-size:11px;color:var(--ink-soft);">시</label><select id="wdHour"></select></div>
+          <div class="field"><label style="font-size:11px;color:var(--ink-soft);">분</label><select id="wdMinute"></select></div>
+          <div class="field"><label style="font-size:11px;color:var(--ink-soft);">시진(時辰)</label><select id="wdShi"></select></div>
+        </div>
+        <label class="unknown-time" style="margin-top:-4px;"><input type="checkbox" id="wdUnknown"> 상대방 태어난 시간을 모릅니다</label>
+        <div class="error-box" id="wdErrorBox"></div>
+      </div>
+      <div style="display:flex; justify-content:flex-end; margin: 4px 0 14px;">
+        <button type="button" id="wdApplyBtn" class="go-btn" style="width:auto; padding:9px 16px; display:none;">이 조건으로 다시 찾기</button>
+      </div>
+      <div id="weddingResult"></div>
+    `;
+    const wdYear=document.getElementById('wdYear'), wdMonth=document.getElementById('wdMonth'), wdDay=document.getElementById('wdDay');
+    const wdHour=document.getElementById('wdHour'), wdMinute=document.getElementById('wdMinute'), wdUnknown=document.getElementById('wdUnknown');
+    const wdShi=document.getElementById('wdShi');
+    const wdBtnSolar=document.getElementById('wdBtnSolar'), wdBtnLunar=document.getElementById('wdBtnLunar'), wdBtnLeap=document.getElementById('wdBtnLeap');
+    const wdErrorBox=document.getElementById('wdErrorBox');
+    let wdCalType='solar', wdIsLeapMonth=false;
+    const ty=new Date().getFullYear();
+    for(let y=ty;y>=1930;y--){ const o=document.createElement('option'); o.value=y; o.textContent=y+'년'; if(y===2000)o.selected=true; wdYear.appendChild(o); }
+    for(let m=1;m<=12;m++){ const o=document.createElement('option'); o.value=m; o.textContent=m+'월'; wdMonth.appendChild(o); }
+    for(let h=0;h<24;h++){ const o=document.createElement('option'); o.value=h; o.textContent=String(h).padStart(2,'0')+'시'; if(h===12)o.selected=true; wdHour.appendChild(o); }
+    for(let mi=0;mi<60;mi++){ const o=document.createElement('option'); o.value=mi; o.textContent=String(mi).padStart(2,'0')+'분'; wdMinute.appendChild(o); }
+    function fillWdDays(){
+      const cur=wdDay.value; wdDay.innerHTML='';
+      let days=30;
+      if(wdCalType==='solar'){ days=new Date(+wdYear.value, +wdMonth.value, 0).getDate(); }
+      for(let d=1;d<=days;d++){ const o=document.createElement('option'); o.value=d; o.textContent=d+'일'; wdDay.appendChild(o); }
+      if(cur && +cur<=days) wdDay.value=cur;
+    }
+    function updateWdLeapBtnStyle(){
+      if(wdCalType==='lunar'){
+        wdBtnLeap.disabled=false; wdBtnLeap.style.cursor='pointer';
+        if(wdIsLeapMonth){ wdBtnLeap.style.background='var(--seal)'; wdBtnLeap.style.color='#fff7ee'; wdBtnLeap.style.borderColor='var(--seal)'; }
+        else { wdBtnLeap.style.background='#fffdf7'; wdBtnLeap.style.color='var(--ink)'; wdBtnLeap.style.borderColor='var(--rule)'; }
+      } else {
+        wdBtnLeap.disabled=true; wdBtnLeap.style.cursor='not-allowed';
+        wdBtnLeap.style.background='#fffdf7'; wdBtnLeap.style.color='var(--ink-soft)'; wdBtnLeap.style.borderColor='var(--rule)';
+      }
+    }
+    fillWdDays(); updateWdLeapBtnStyle();
+    wdYear.addEventListener('change',fillWdDays); wdMonth.addEventListener('change',fillWdDays);
+    wdBtnSolar.addEventListener('click',()=>{
+      wdCalType='solar'; wdBtnSolar.classList.add('active'); wdBtnLunar.classList.remove('active');
+      wdIsLeapMonth=false; updateWdLeapBtnStyle(); fillWdDays();
+    });
+    wdBtnLunar.addEventListener('click',()=>{
+      wdCalType='lunar'; wdBtnLunar.classList.add('active'); wdBtnSolar.classList.remove('active');
+      updateWdLeapBtnStyle(); fillWdDays();
+    });
+    wdBtnLeap.addEventListener('click',()=>{
+      if(wdBtnLeap.disabled) return;
+      wdIsLeapMonth=!wdIsLeapMonth; updateWdLeapBtnStyle();
+    });
+    function buildWdShiOptions(){
+      const shift=30;
+      const prev=wdShi.value;
+      const items=[['','시·분 입력']];
+      items.push(['ja-dawn',`자시 새벽 ${fmtHM(0)}~${fmtHM(60+shift-1)}`]);
+      for(let k=1;k<=11;k++) items.push([String(k),`${SHI_NAMES[k]}시 ${fmtHM((2*k-1)*60+shift)}~${fmtHM((2*k+1)*60+shift-1)}`]);
+      items.push(['ja-night',`자시 밤 ${fmtHM(23*60+shift)}~23:59 (다음 날 일주)`]);
+      wdShi.innerHTML='';
+      items.forEach(([v,t])=>{ const o=document.createElement('option'); o.value=v; o.textContent=t; wdShi.appendChild(o); });
+      wdShi.value=prev;
+    }
+    function applyWdShiChoice(){
+      const v=wdShi.value;
+      const unknown=wdUnknown.checked;
+      if(!v || unknown){
+        wdHour.disabled=unknown; wdMinute.disabled=unknown;
+        wdHour.style.opacity=unknown?0.4:1; wdMinute.style.opacity=unknown?0.4:1;
+        return;
+      }
+      let h,m;
+      if(v==='ja-dawn'){ h=0; m=45; }
+      else if(v==='ja-night'){ h=23; m=45; }
+      else { h=2*parseInt(v,10); m=30; }
+      wdHour.value=String(h); wdMinute.value=String(m);
+      wdHour.disabled=true; wdMinute.disabled=true;
+      wdHour.style.opacity=0.4; wdMinute.style.opacity=0.4;
+    }
+    buildWdShiOptions();
+    wdShi.addEventListener('change',applyWdShiChoice);
+    wdUnknown.addEventListener('change',()=>{
+      const on=wdUnknown.checked;
+      wdShi.disabled=on; wdShi.style.opacity=on?0.4:1;
+      if(on){ wdShi.value=''; }
+      applyWdShiChoice();
+    });
+
+    const wdModeSelf=document.getElementById('wdModeSelf'), wdModeBoth=document.getElementById('wdModeBoth');
+    const wdPartnerForm=document.getElementById('wdPartnerForm'), wdApplyBtn=document.getElementById('wdApplyBtn');
+    wdModeSelf.addEventListener('click',()=>{
+      wdModeSelf.classList.add('active'); wdModeBoth.classList.remove('active');
+      wdPartnerForm.style.display='none'; wdApplyBtn.style.display='none';
+      renderWeddingResult(null);
+    });
+    wdModeBoth.addEventListener('click',()=>{
+      wdModeBoth.classList.add('active'); wdModeSelf.classList.remove('active');
+      wdPartnerForm.style.display=''; wdApplyBtn.style.display='inline-block';
+      document.getElementById('weddingResult').innerHTML = '<p style="font-size:12.5px;color:var(--ink-soft);">상대방 정보를 입력한 뒤 "이 조건으로 다시 찾기"를 눌러주세요.</p>';
+    });
+    wdApplyBtn.addEventListener('click',()=>{
+      wdErrorBox.classList.remove('show'); wdErrorBox.textContent='';
+      const inPy=+wdYear.value, inPm=+wdMonth.value, inPd=+wdDay.value, pIsMale=document.getElementById('wdGender').value==='1';
+      let py=inPy, pm=inPm, pd=inPd;
+      if(wdCalType==='lunar'){
+        const conv=lunarToSolar(inPy, inPm, wdIsLeapMonth, inPd);
+        if(conv.error){ wdErrorBox.textContent=conv.error; wdErrorBox.classList.add('show'); return; }
+        py=conv.year; pm=conv.month; pd=conv.day;
+      }
+      const pHasTime=!wdUnknown.checked, pHour=pHasTime?+wdHour.value:12, pMinute=pHasTime?+wdMinute.value:0;
+      const p=computeSaju(py,pm,pd,pHour,pMinute,pHasTime,true);
+      const pCounts={목:0,화:0,토:0,금:0,수:0};
+      [p.year,p.month,p.day].concat(p.hour?[p.hour]:[]).forEach(pt=>{ pCounts[STEM_ELEM[pt.stem]]++; pCounts[BRANCH_ELEM[pt.branch]]++; });
+      const pStrength = assessStrength(p, p.day.stem).strength;
+      const pYs = computeYongsin(STEM_ELEM[p.day.stem], pStrength);
+      renderWeddingResult({s:p, ys:pYs});
+    });
+
+    renderWeddingResult(null);
   }
 
   const ZODIAC=[
