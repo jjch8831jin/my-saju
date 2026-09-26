@@ -2663,6 +2663,7 @@
       <div class="mini-form">
         <div class="field"><label style="font-size:11px;color:var(--ink-soft);">시</label><select id="cpHour"></select></div>
         <div class="field"><label style="font-size:11px;color:var(--ink-soft);">분</label><select id="cpMinute"></select></div>
+        <div class="field"><label style="font-size:11px;color:var(--ink-soft);">시진(時辰)</label><select id="cpShi"></select></div>
       </div>
       <label class="unknown-time" style="margin-top:-4px;"><input type="checkbox" id="cpUnknown"> 상대방 태어난 시간을 모릅니다</label>
       <div class="error-box" id="cpErrorBox"></div>
@@ -2671,6 +2672,7 @@
     `;
     const cpYear=document.getElementById('cpYear'), cpMonth=document.getElementById('cpMonth'), cpDay=document.getElementById('cpDay');
     const cpHour=document.getElementById('cpHour'), cpMinute=document.getElementById('cpMinute'), cpUnknown=document.getElementById('cpUnknown');
+    const cpShi=document.getElementById('cpShi');
     const cpBtnSolar=document.getElementById('cpBtnSolar'), cpBtnLunar=document.getElementById('cpBtnLunar'), cpBtnLeap=document.getElementById('cpBtnLeap');
     const cpErrorBox=document.getElementById('cpErrorBox');
     let cpCalType='solar', cpIsLeapMonth=false;
@@ -2710,9 +2712,42 @@
       if(cpBtnLeap.disabled) return;
       cpIsLeapMonth=!cpIsLeapMonth; updateCpLeapBtnStyle();
     });
+    // ---- 시(時) 바로 선택: 자시·축시·인시… 로 고르기 (궁합 계산은 항상 진태양시 보정을 적용하므로 -30분 고정) ----
+    function buildCpShiOptions(){
+      const shift=30;
+      const prev=cpShi.value;
+      const items=[['','시·분 입력']];
+      items.push(['ja-dawn',`자시 새벽 ${fmtHM(0)}~${fmtHM(60+shift-1)}`]);
+      for(let k=1;k<=11;k++) items.push([String(k),`${SHI_NAMES[k]}시 ${fmtHM((2*k-1)*60+shift)}~${fmtHM((2*k+1)*60+shift-1)}`]);
+      items.push(['ja-night',`자시 밤 ${fmtHM(23*60+shift)}~23:59 (다음 날 일주)`]);
+      cpShi.innerHTML='';
+      items.forEach(([v,t])=>{ const o=document.createElement('option'); o.value=v; o.textContent=t; cpShi.appendChild(o); });
+      cpShi.value=prev;
+    }
+    function applyCpShiChoice(){
+      const v=cpShi.value;
+      const unknown=cpUnknown.checked;
+      if(!v || unknown){
+        cpHour.disabled=unknown; cpMinute.disabled=unknown;
+        cpHour.style.opacity=unknown?0.4:1; cpMinute.style.opacity=unknown?0.4:1;
+        return;
+      }
+      let h,m;
+      if(v==='ja-dawn'){ h=0; m=45; }
+      else if(v==='ja-night'){ h=23; m=45; }
+      else { h=2*parseInt(v,10); m=30; }
+      cpHour.value=String(h); cpMinute.value=String(m);
+      cpHour.disabled=true; cpMinute.disabled=true;
+      cpHour.style.opacity=0.4; cpMinute.style.opacity=0.4;
+    }
+    buildCpShiOptions();
+    cpShi.addEventListener('change',applyCpShiChoice);
+
     cpUnknown.addEventListener('change',()=>{
-      const on=cpUnknown.checked; cpHour.disabled=on; cpMinute.disabled=on;
-      cpHour.style.opacity=on?0.4:1; cpMinute.style.opacity=on?0.4:1;
+      const on=cpUnknown.checked;
+      cpShi.disabled=on; cpShi.style.opacity=on?0.4:1;
+      if(on){ cpShi.value=''; }
+      applyCpShiChoice();
     });
 
     document.getElementById('cpGo').addEventListener('click',()=>{
