@@ -2040,6 +2040,7 @@
   let state=null;
   let selectedDwIdx=null, selectedSwYear=null;
   let qnaHistory=[];
+  let cpQnaHistory=[]; let cpCtx=null;
   let suppressAutoSave=false;
 
   document.getElementById('btnGo').addEventListener('click',()=>{
@@ -2737,6 +2738,24 @@
       else if(hasPair(CHUNG_P,myB,pB)){ branchVerdict='충(沖)'; branchText='띠 궁합이 충 관계로, 서로 부딪히기 쉬운 조합이라 배려와 대화가 특히 중요합니다.'; }
       else { branchVerdict='평범한 관계'; branchText='띠 궁합상 특별히 강하게 좋거나 나쁜 관계는 아니며, 두 사람의 노력에 따라 달라질 수 있습니다.'; }
 
+      // 두 사람의 사주 전체(십신·지장간·십이운성·용신·대운 포함) + 서로에 대한 십신 관계를 함께 계산해서
+      // AI 심층 풀이와 궁합 Q&A가 공통으로 쓸 수 있도록 저장해둔다.
+      const pCounts={목:0,화:0,토:0,금:0,수:0};
+      [p.year,p.month,p.day].concat(p.hour?[p.hour]:[]).forEach(pt=>{ pCounts[STEM_ELEM[pt.stem]]++; pCounts[BRANCH_ELEM[pt.branch]]++; });
+      const pStrength = assessStrength(p, p.day.stem).strength;
+      const pYs = computeYongsin(STEM_ELEM[p.day.stem], pStrength);
+      const myFull = buildSajuSummary(s, dayStemIdx, state.isMale, state.counts, state.strength, state.ys, state.year, state.month, state.day);
+      const partnerFull = buildSajuSummary(p, p.day.stem, pIsMale, pCounts, pStrength, pYs, py, pm, pd)
+        .split('\n').filter(l=>l.indexOf('[오늘 날짜]')!==0).join('\n');
+      const crossLines = [
+        `상대 일간(${STEM_HANJA[p.day.stem]})은 내 일간 기준 십신: ${tenGod(dayStemIdx, partnerElem, p.day.stem%2===0)}`,
+        `내 일간(${STEM_HANJA[dayStemIdx]})은 상대 일간 기준 십신: ${tenGod(p.day.stem, myElem, dayStemIdx%2===0)}`,
+        `상대 일지(${BRANCH_HANJA[p.day.branch]})는 내 일간 기준 십신: ${tenGod(dayStemIdx, BRANCH_ELEM[p.day.branch], p.day.branch%2===0)}`,
+        `내 일지(${BRANCH_HANJA[s.day.branch]})는 상대 일간 기준 십신: ${tenGod(p.day.stem, BRANCH_ELEM[s.day.branch], s.day.branch%2===0)}`
+      ];
+      cpCtx = { myFull, partnerFull, crossLines, elemVerdict, elemText, branchVerdict, branchText };
+      cpQnaHistory = [];
+
       document.getElementById('cpResult').innerHTML = `
         <h5>일간 오행 궁합 — ${elemVerdict}</h5>
         <p>나: ${STEM_HANJA[dayStemIdx]}(${myElem}) · 상대: ${STEM_HANJA[p.day.stem]}(${partnerElem})<br>${elemText}</p>
@@ -2746,27 +2765,84 @@
         <div class="ai-loading" id="aiCompatLoading">AI가 두 사람의 궁합을 분석하고 있어요...</div>
         <div class="ai-error" id="aiCompatError"></div>
         <div class="ai-box" id="aiCompatBox"></div>
+        <h5 style="margin-top:22px;">궁합 Q&amp;A</h5>
+        <p style="font-size:12.5px;color:var(--ink-soft);">두 사람의 사주를 함께 반영해서 궁금한 점을 물어보세요. 예: "우리 둘이 결혼하면 어떨까요?", "올해 우리 사이에 갈등이 생길 수 있나요?"</p>
+        <div id="cpQnaHistoryBox" style="display:flex; flex-direction:column; gap:14px; margin:14px 0;"></div>
+        <div class="ai-loading" id="cpQnaLoading">AI가 답변을 준비하고 있어요...</div>
+        <div class="ai-error" id="cpQnaError"></div>
+        <div class="voice-input-wrap">
+          <textarea id="cpQnaInput" rows="3" placeholder="질문을 입력하세요... (Enter로 바로 질문, 줄바꿈은 Shift+Enter)" style="width:100%;font-family:inherit;font-size:13.5px;padding:10px;border:1px solid var(--rule);border-radius:8px;background:#fffdf7;resize:vertical;margin-bottom:8px;min-height:84px;max-height:30vh;"></textarea>
+          <button type="button" class="mic-btn" id="micCpQnaInput" title="음성으로 입력" style="bottom:16px;">🎤</button>
+        </div>
+        <div class="mic-err" id="micErrCpQnaInput"></div>
+        <button class="ai-btn" id="cpQnaBtn" style="margin-top:0;">질문하기</button>
       `;
       wireAI('aiCompatBtn','aiCompatLoading','aiCompatError','aiCompatBox', ()=>{
-        // 두 사람의 사주 전체(십신·지장간·십이운성·용신·대운 포함) + 서로에 대한 십신 관계를 함께 전달
-        const pCounts={목:0,화:0,토:0,금:0,수:0};
-        [p.year,p.month,p.day].concat(p.hour?[p.hour]:[]).forEach(pt=>{ pCounts[STEM_ELEM[pt.stem]]++; pCounts[BRANCH_ELEM[pt.branch]]++; });
-        const pStrength = assessStrength(p, p.day.stem).strength;
-        const pYs = computeYongsin(STEM_ELEM[p.day.stem], pStrength);
-        const myFull = buildSajuSummary(s, dayStemIdx, state.isMale, state.counts, state.strength, state.ys, state.year, state.month, state.day);
-        const partnerFull = buildSajuSummary(p, p.day.stem, pIsMale, pCounts, pStrength, pYs, py, pm, pd)
-          .split('\n').filter(l=>l.indexOf('[오늘 날짜]')!==0).join('\n');
-        const crossLines = [
-          `상대 일간(${STEM_HANJA[p.day.stem]})은 내 일간 기준 십신: ${tenGod(dayStemIdx, partnerElem, p.day.stem%2===0)}`,
-          `내 일간(${STEM_HANJA[dayStemIdx]})은 상대 일간 기준 십신: ${tenGod(p.day.stem, myElem, dayStemIdx%2===0)}`,
-          `상대 일지(${BRANCH_HANJA[p.day.branch]})는 내 일간 기준 십신: ${tenGod(dayStemIdx, BRANCH_ELEM[p.day.branch], p.day.branch%2===0)}`,
-          `내 일지(${BRANCH_HANJA[s.day.branch]})는 상대 일간 기준 십신: ${tenGod(p.day.stem, BRANCH_ELEM[s.day.branch], s.day.branch%2===0)}`
-        ];
         const ctx = (document.getElementById('ctxShared').value||'').trim();
         const ctxBlock = ctx ? `\n\n[질문자가 알려준 현재 상황]\n${ctx}\n\n위 상황은 질문자가 직접 알려준 사실이니 이것만 참고하고, 확인되지 않은 과거사를 새로 지어내거나 마치 미리 알고 있었던 것처럼 단정하지 마.` : '';
         return `다음은 두 사람의 사주 정보입니다.\n\n[나의 사주]\n${myFull}\n\n[상대방의 사주]\n${partnerFull}\n\n[서로에 대한 십신 관계]\n${crossLines.join('\n')}\n\n[간단 궁합 결과]\n일간 오행 관계: ${elemVerdict} (${elemText})\n띠 관계: ${branchVerdict} (${branchText})${ctxBlock}\n\n이 정보를 바탕으로 두 사람의 궁합을 한국어로 구체적으로 풀어서 작성해줘. 두 사람의 십신(특히 서로에 대한 십신 관계와 각자 사주의 십신 분포)과 오행·용신 보완 관계를 근거로 삼아서, 서로 잘 맞는 부분과 유의하면 좋을 부분을 균형 있게 담아줘. 분량 제한 없이 충분히 길고 깊이 있게 써줘. 문단을 나눠 읽기 편하게 쓰되, 소제목·번호 목록·마크다운 기호(** 등) 없이 일반 글로 작성해줘.`;
       });
+
+      renderCpQnaHistory();
+      document.getElementById('cpQnaBtn').addEventListener('click', askCpQna);
+      wireAutoGrow(document.getElementById('cpQnaInput'));
+      attachVoiceInput('cpQnaInput','micCpQnaInput','micErrCpQnaInput');
+      document.getElementById('cpQnaInput').addEventListener('keydown',(e)=>{
+        if(e.key==='Enter' && !e.shiftKey && !e.isComposing){ e.preventDefault(); askCpQna(); }
+      });
     });
+  }
+  function renderCpQnaHistory(){
+    const box=document.getElementById('cpQnaHistoryBox');
+    if(!box) return;
+    if(cpQnaHistory.length===0){ box.innerHTML='<p style="font-size:12px;color:var(--ink-soft);margin:0;">아직 질문이 없습니다. 아래 칸에 질문을 입력해보세요.</p>'; return; }
+    box.innerHTML = cpQnaHistory.map(item=>{
+      let answerHtml;
+      if(item.a!=null) answerHtml=`<div class="ai-box show" style="margin-top:0;">${escapeHtml(item.a)}</div>`;
+      else if(item.err) answerHtml=`<div class="ai-box show" style="margin-top:0; color:var(--seal);">⚠️ ${escapeHtml(item.err)}</div>`;
+      else answerHtml=`<div class="ai-box show" style="margin-top:0; color:var(--ink-soft);">AI가 답변을 준비하고 있어요…</div>`;
+      return `
+      <div class="qna-item">
+        <div style="font-size:13px;font-weight:700;color:var(--ink);margin-bottom:6px;">Q. ${escapeHtml(item.q)}</div>
+        ${answerHtml}
+      </div>`;
+    }).join('');
+  }
+  let cpQnaBusy=false;
+  async function askCpQna(){
+    if(!state || !cpCtx || cpQnaBusy) return;
+    const input=document.getElementById('cpQnaInput');
+    const q = input.value.trim();
+    if(!q) return;
+    const err=document.getElementById('cpQnaError'), btn=document.getElementById('cpQnaBtn');
+    err.classList.remove('show'); err.textContent='';
+    cpQnaBusy=true; btn.disabled=true; btn.textContent='답변 중...';
+
+    const item={q, a:null, err:null};
+    cpQnaHistory.push(item);
+    input.value='';
+    autoGrow(input);
+    renderCpQnaHistory();
+
+    try{
+      const {myFull, partnerFull, crossLines, elemVerdict, elemText, branchVerdict, branchText} = cpCtx;
+      const ctx = (document.getElementById('ctxShared').value||'').trim();
+      const ctxBlock = ctx ? `\n\n[질문자가 알려준 현재 상황]\n${ctx}\n\n위 상황은 질문자가 직접 알려준 사실이니 이것만 참고하고, 확인되지 않은 과거사를 새로 지어내거나 마치 미리 알고 있었던 것처럼 단정하지 마.` : '';
+      const past = cpQnaHistory.filter(it=>it!==item && it.a!=null).slice(-10).map((it,i)=>`Q${i+1}. ${it.q}\nA${i+1}. ${it.a}`).join('\n\n');
+      const histBlock = past ? `\n\n[지금까지 나눈 대화]\n${past}\n\n위 대화를 기억하고 이어서 답해줘. 질문에 "그럼", "그 사람", "아까 말한 것"처럼 앞 내용을 가리키는 말이 있으면 위 대화에서 찾아 이해하고, 이미 설명한 내용은 반복하지 말고 이어서 새로운 내용을 답해줘.` : '';
+      const prompt = `다음은 두 사람의 사주 정보입니다.\n\n[나의 사주]\n${myFull}\n\n[상대방의 사주]\n${partnerFull}\n\n[서로에 대한 십신 관계]\n${crossLines.join('\n')}\n\n[간단 궁합 결과]\n일간 오행 관계: ${elemVerdict} (${elemText})\n띠 관계: ${branchVerdict} (${branchText})${ctxBlock}${histBlock}\n\n반드시 위 두 사람의 사주 정보(오행, 십신, 지장간, 십이운성, 형충회합, 용신, 대운 등)와 서로에 대한 십신 관계를 종합해서 아래 질문에 답변해줘. 두루뭉술하게 얼버무리지 말고, 명리학적으로 판단되는 결론을 첫 문장에서 직설적으로 먼저 제시한 뒤(예/아니오, 좋다/신중해야 한다, 잘 맞는다/유의해야 한다 등 명확한 입장), 두 사람의 사주의 어떤 요소 때문에 그렇게 판단하는지 구체적 근거를 이어서 설명해줘. 분량 제한 없이 충분히 깊이 있게 한국어로 답해줘. 문단을 나눠 읽기 편하게 쓰되, 소제목·번호 목록·마크다운 기호(** 등) 없이 일반 글로 작성해줘.\n\n질문: ${q}`;
+      const answer = await callClaude(prompt);
+      item.a = answer||'답변을 받지 못했습니다.';
+    } catch(e){
+      item.err = '답변을 불러오지 못했습니다 (' + e.message + '). 같은 질문을 다시 보내 주세요.';
+      const inp=document.getElementById('cpQnaInput');
+      if(inp && !inp.value){ inp.value=q; autoGrow(inp); }
+    } finally {
+      cpQnaBusy=false;
+      const b=document.getElementById('cpQnaBtn');
+      if(b){ b.disabled=false; b.textContent='질문하기'; }
+      renderCpQnaHistory();
+    }
   }
 
   function scanUpcoming(days, filterFn){
