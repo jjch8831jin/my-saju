@@ -809,10 +809,37 @@
     return {yong,hui,gi,gu};
   }
 
+  // ---- 격국(格局) — 자평진전 기준 다수설을 간략화한 참고용 판정 (내격 10격만, 외격·파격은 판단하지 않음) ----
+  function determineGyeokguk(s, dayStemIdx){
+    const mb=s.month.branch;
+    const hiddenIdx=HIDDEN[mb].map(h=>STEM_HANJA.indexOf(h)); // [여기, (중기), 정기] 순
+    const stemsToCheck=[s.year.stem, s.month.stem];
+    if(s.hour) stemsToCheck.push(s.hour.stem);
+    const jeongiStem=hiddenIdx[hiddenIdx.length-1];
+    const tgOf=(stemIdx)=> tenGod(dayStemIdx, STEM_ELEM[stemIdx], stemIdx%2===0);
+    const jeongiTg=tgOf(jeongiStem);
+    let chosenStem=null, chosenTg=null, note='';
+    if(jeongiTg!=='비견' && jeongiTg!=='겁재'){
+      chosenStem=jeongiStem; chosenTg=jeongiTg;
+      note = stemsToCheck.includes(jeongiStem) ? '월지 정기가 천간에 투출' : '월지 정기 기준(미투출)';
+    } else {
+      // 정기가 비겁이면, 중기·여기 중 투출한 다른 글자를 우선 확인
+      for(let i=hiddenIdx.length-2;i>=0;i--){
+        const st=hiddenIdx[i], tg=tgOf(st);
+        if((tg!=='비견'&&tg!=='겁재') && stemsToCheck.includes(st)){ chosenStem=st; chosenTg=tg; note='월지 중기/여기가 천간에 투출'; break; }
+      }
+      if(chosenStem===null){
+        return { gyeokName: (jeongiTg==='겁재'?'양인격':'건록격'), note:'월지가 비겁(比劫)이라 별도 명명', simplified:true };
+      }
+    }
+    return { gyeokName: chosenTg+'격', note, simplified:true };
+  }
+
   const SIXHAP_P=[[0,1],[2,11],[3,10],[4,9],[5,8],[6,7]];
   const CHUNG_P=[[0,6],[1,7],[2,8],[3,9],[4,10],[5,11]];
   const HAE_P=[[0,7],[1,6],[2,5],[3,4],[8,11],[9,10]];
   const WONJIN_P=[[0,7],[1,6],[2,9],[3,8],[4,11],[5,10]]; // 원진: 자미·축오·인유·묘신·진해·사술
+  const GWIMUN_P=[[0,9],[1,6],[2,7],[3,8],[4,11],[5,10]]; // 귀문관살: 자유·축오·인미·묘신·진해·사술
   const BANGHAP_GROUPS=[[11,0,1],[2,3,4],[5,6,7],[8,9,10]]; // 해자축·인묘진·사오미·신유술 (계절 순서대로)
   function gosinGwasukForBranch(branch){
     const g=BANGHAP_GROUPS.find(g=>g.includes(branch));
@@ -820,6 +847,52 @@
     return { gosin: mod(g[g.length-1]+1,12), gwasuk: mod(g[0]-1,12) }; // 고신: 그룹 다음 글자, 과숙: 그룹 앞 글자
   }
   const SAMHAP_GROUPS=[{name:'화국',elem:'화',set:[2,6,10]},{name:'금국',elem:'금',set:[5,9,1]},{name:'수국',elem:'수',set:[8,0,4]},{name:'목국',elem:'목',set:[11,3,7]}];
+  function ganjiIdx(stem,branch){
+    for(let k=0;k<6;k++){ const x=stem+10*k; if(mod(x,12)===branch) return mod(x,60); }
+    return null;
+  }
+  function gongmangBranches(stem,branch){
+    const idx=ganjiIdx(stem,branch); if(idx===null) return [];
+    const branchStart=mod(Math.floor(idx/10)*10,12);
+    return [mod(branchStart+10,12), mod(branchStart+11,12)];
+  }
+  const SINSAL12_ORDER=['겁살','재살','천살','지살','년살','월살','망신살','장성살','반안살','역마살','육해살','화개살'];
+  function twelveSinsalMap(yearBranch){
+    const g=SAMHAP_GROUPS.find(g=>g.set.includes(yearBranch));
+    if(!g) return {};
+    const end=g.set[2], map={};
+    for(let i=0;i<12;i++) map[mod(end+1+i,12)]=SINSAL12_ORDER[i];
+    return map;
+  }
+  const YANGIN_MAP={0:3,2:6,4:6,6:9,8:0}; // 양간(갑병무경임) 전용: 갑→묘, 병·무→오, 경→유, 임→자
+  const GOEGANG_P=[[6,4],[6,10],[8,4],[4,10]]; // 경진·경술·임진·무술 (일주 기준, 고전 4개 기준)
+  const BAEKHO_P=[[0,4],[1,7],[2,10],[3,1],[4,4],[8,10],[9,1]]; // 갑진·을미·병술·정축·무진·임술·계축 (일주 기준)
+  function detectNamedSinsal(s){
+    const results=[];
+    const dSt=s.day.stem, dBr=s.day.branch;
+    if(GOEGANG_P.some(p=>p[0]===dSt&&p[1]===dBr)) results.push(`괴강살(${STEM_HANJA[dSt]}${BRANCH_HANJA[dBr]}일주)`);
+    if(BAEKHO_P.some(p=>p[0]===dSt&&p[1]===dBr)) results.push(`백호살(${STEM_HANJA[dSt]}${BRANCH_HANJA[dBr]}일주)`);
+    const yanginBranch=YANGIN_MAP[dSt];
+    if(yanginBranch!==undefined){
+      const positions=[['년',s.year.branch],['월',s.month.branch],['일',s.day.branch]];
+      if(s.hour) positions.push(['시',s.hour.branch]);
+      const hit=positions.filter(p=>p[1]===yanginBranch).map(p=>p[0]);
+      if(hit.length) results.push(`양인살(${hit.join('·')}지)`);
+    }
+    if(dSt===0 || dSt===7) results.push(`현침살(일간 ${STEM_HANJA[dSt]})`); // 자평 다수설: 일간이 갑·신(辛)일 때
+    return results;
+  }
+  // 천을귀인·문창귀인: 일간 기준으로 어느 지지에 해당하는지 (일간 자신은 제외, 년/월/일/시지만 확인)
+  const CHEONEUL_MAP={0:[1,7],4:[1,7],6:[1,7], 1:[0,8],5:[0,8], 2:[11,9],3:[11,9], 7:[2,6], 8:[3,5],9:[3,5]};
+  const MUNCHANG_MAP={0:5,1:6,2:8,3:9,4:8,5:9,6:11,7:0,8:2,9:3};
+  function detectGwiinBranches(s){
+    const dSt=s.day.stem;
+    const targets={};
+    const add=(list,name)=>{ (list||[]).forEach(b=>{ targets[b]=targets[b]||[]; targets[b].push(name); }); };
+    add(CHEONEUL_MAP[dSt], '천을귀인');
+    if(MUNCHANG_MAP[dSt]!==undefined) add([MUNCHANG_MAP[dSt]], '문창귀인');
+    return targets; // branch idx -> [이름들]
+  }
   const STEM_HAP_P=[[0,5,'토'],[1,6,'금'],[2,7,'수'],[3,8,'목'],[4,9,'화']]; // 갑기합토·을경합금·병신합수·정임합목·무계합화
   const STEM_CHUNG_P=[[0,6],[1,7],[2,8],[3,9]]; // 갑경충·을신충·병임충·정계충
   function hasPair(list,ai,bi){ return list.some(p=>(p[0]===ai&&p[1]===bi)||(p[1]===ai&&p[0]===bi)); }
@@ -852,6 +925,14 @@
         const p=HAE_P.find(p=>(p[0]===a.idx&&p[1]===b.idx)||(p[1]===a.idx&&p[0]===b.idx));
         results.push({type:'해',pair:[a.label,b.label],charName:BRANCHES[p[0]]+BRANCHES[p[1]]+'해'});
       }
+      if(hasPair(WONJIN_P,a.idx,b.idx)){
+        const p=WONJIN_P.find(p=>(p[0]===a.idx&&p[1]===b.idx)||(p[1]===a.idx&&p[0]===b.idx));
+        results.push({type:'원진',pair:[a.label,b.label],charName:BRANCHES[p[0]]+BRANCHES[p[1]]+'원진'});
+      }
+      if(hasPair(GWIMUN_P,a.idx,b.idx)){
+        const p=GWIMUN_P.find(p=>(p[0]===a.idx&&p[1]===b.idx)||(p[1]===a.idx&&p[0]===b.idx));
+        results.push({type:'귀문관살',pair:[a.label,b.label],charName:BRANCHES[p[0]]+BRANCHES[p[1]]+'귀문'});
+      }
       if(a.idx===b.idx && [4,6,9,11].includes(a.idx)) results.push({type:'자형',pair:[a.label,b.label],charName:BRANCHES[a.idx]+BRANCHES[a.idx]+'자형'});
       if((a.idx===0&&b.idx===3)||(a.idx===3&&b.idx===0)) results.push({type:'상형(자묘)',pair:[a.label,b.label],charName:'자묘형'});
     }
@@ -872,6 +953,8 @@
   const REL_DESC={
     '육합':'서로 합을 이루어 조화와 결속을 만드는 관계입니다.',
     '충':'정면으로 부딪히는 관계로, 변화·이동·갈등의 신호가 될 수 있습니다.',
+    '원진':'서로 미묘하게 어긋나고 꺼리는 관계로, 가까운 사이일수록 오히려 섭섭함이나 갈등이 쌓이기 쉽습니다.',
+    '귀문관살':'남들보다 예민하고 직관적인 기운이 겹치는 관계로, 통찰력이나 감수성이 두드러지는 대신 신경이 날카로워지기 쉽습니다.',
     '해':'은근히 서로 방해가 되는 관계로, 가까운 사이에 오해가 생기기 쉽습니다.',
     '자형':'같은 지지가 겹쳐 스스로를 옥죄는 자형 관계로, 정체나 스트레스가 생기기 쉽습니다.',
     '상형(자묘)':'예의와 관련된 마찰이 생기기 쉬운 상형 관계입니다.',
@@ -1156,8 +1239,8 @@
   }
 
   // ---- 사주원국 형충회합 연결선 ----
-  const REL_SYMBOL={'천간합':'合','천간충':'沖','육합':'合','충':'沖','해':'害','자형':'刑','상형(자묘)':'刑'};
-  const REL_LINE_COLOR={'천간합':'#3d7a5c','육합':'#3d7a5c','천간충':'#b23a2e','충':'#b23a2e','해':'#c99a3b','자형':'#6b4fa0','상형(자묘)':'#6b4fa0'};
+  const REL_SYMBOL={'천간합':'合','천간충':'沖','육합':'合','충':'沖','해':'害','원진':'嗔','귀문관살':'鬼','자형':'刑','상형(자묘)':'刑'};
+  const REL_LINE_COLOR={'천간합':'#3d7a5c','육합':'#3d7a5c','천간충':'#b23a2e','충':'#b23a2e','해':'#c99a3b','원진':'#a0522d','귀문관살':'#5a4a8a','자형':'#6b4fa0','상형(자묘)':'#6b4fa0'};
   function relSymbolFor(type){
     if(REL_SYMBOL[type]) return REL_SYMBOL[type];
     if(type.indexOf('삼합')===0||type.indexOf('반합')===0) return '合';
@@ -1260,15 +1343,34 @@
     if(!state) return;
     const s=state.s, dayStemIdx=state.dayStemIdx, hasTime=state.hasTime;
     const extra=getExtraColumns();
+    const gongmang=gongmangBranches(s.day.stem, s.day.branch);
+    const sinsalMap=twelveSinsalMap(s.year.branch);
+    const gwiinMap=detectGwiinBranches(s);
+    const mkExtra=(branch)=>({ isGongmang: gongmang.includes(branch), sinsal: sinsalMap[branch], gwiin: gwiinMap[branch] });
     let html='';
     extra.forEach(c=>{ html+=pillarHTML(c.tag, c.part, dayStemIdx, false, true, 'extra-col'); });
-    html+=pillarHTML('시주 · 時柱', s.hour, dayStemIdx, false, hasTime);
-    html+=pillarHTML('일주 · 日柱', s.day, dayStemIdx, true, true);
-    html+=pillarHTML('월주 · 月柱', s.month, dayStemIdx, false, true);
-    html+=pillarHTML('년주 · 年柱', s.year, dayStemIdx, false, true);
+    html+=pillarHTML('시주 · 時柱', s.hour, dayStemIdx, false, hasTime, undefined, s.hour?mkExtra(s.hour.branch):undefined);
+    html+=pillarHTML('일주 · 日柱', s.day, dayStemIdx, true, true, undefined, mkExtra(s.day.branch));
+    html+=pillarHTML('월주 · 月柱', s.month, dayStemIdx, false, true, undefined, mkExtra(s.month.branch));
+    html+=pillarHTML('년주 · 年柱', s.year, dayStemIdx, false, true, undefined, mkExtra(s.year.branch));
     const pillarsEl=document.getElementById('pillars');
     pillarsEl.innerHTML=html;
     pillarsEl.style.gridTemplateColumns=`repeat(${extra.length+4},1fr)`;
+    const named=detectNamedSinsal(s);
+    const gyeok=determineGyeokguk(s, dayStemIdx);
+    const gmLabel=gongmang.map(b=>BRANCH_HANJA[b]).join('·');
+    let noteHtml = `<span>공망(空亡): ${gmLabel}</span>`;
+    noteHtml += ` <span style="margin-left:10px;">· 격국(참고): ${gyeok.gyeokName} (${gyeok.note})</span>`;
+    if(named.length) noteHtml += ` <span style="margin-left:10px;">· ${named.join(', ')}</span>`;
+    let noteEl=document.getElementById('sinsalNote');
+    if(!noteEl){
+      noteEl=document.createElement('div');
+      noteEl.id='sinsalNote';
+      noteEl.style.cssText='font-size:11.5px;color:var(--ink-soft);margin:8px 2px 0;';
+      const wrap=document.getElementById('pillarsWrap');
+      wrap.parentNode.insertBefore(noteEl, wrap.nextSibling);
+    }
+    noteEl.innerHTML = noteHtml;
     drawRelSVGs();
   }
   function buildFullStemBranchLists(){
@@ -1314,7 +1416,7 @@
     }
   }
 
-  function pillarHTML(tag, part, dayStemIdx, isDayStem, hasTime, extraClass){
+  function pillarHTML(tag, part, dayStemIdx, isDayStem, hasTime, extraClass, extra){
     if(!part) return `<div class="pillar"><div class="tag">${tag}</div><div class="hangeul" style="opacity:.5;">모름</div></div>`;
     const sElem=STEM_ELEM[part.stem], bElem=BRANCH_ELEM[part.branch];
     const sColor=ELEM_COLOR[sElem], bColor=ELEM_COLOR[bElem];
@@ -1328,6 +1430,9 @@
     const stemGlyphHtml = isDayStem
       ? `<div class="glyph ilgan-btn" data-stem="${part.stem}" style="background:${sColor};cursor:pointer;box-shadow:inset 0 0 0 1px rgba(255,255,255,0.25), 0 0 0 2px var(--seal);">${STEM_HANJA[part.stem]}</div>`
       : `<div class="glyph" style="background:${sColor}">${STEM_HANJA[part.stem]}</div>`;
+    const gongmangHtml = extra && extra.isGongmang ? `<div class="gongmang-badge" style="margin-top:-4px;color:var(--seal);font-size:10.5px;">空亡</div>` : '';
+    const sinsalHtml = extra && extra.sinsal ? `<div class="sinsal12-tag" style="margin-top:2px;font-size:11px;color:var(--ink-soft);">${extra.sinsal}</div>` : '';
+    const gwiinHtml = extra && extra.gwiin && extra.gwiin.length ? `<div class="gwiin-tag" style="margin-top:2px;font-size:10.5px;color:var(--gold);">${extra.gwiin.join('·')}</div>` : '';
     return `<div class="pillar${extraClass?' '+extraClass:''}">
         <div class="tag">${tag}</div>
         ${stemTGHtml}
@@ -1340,6 +1445,9 @@
         <div class="hangeul">${BRANCHES[part.branch]} · ${bElem} · ${branchYang?'陽':'陰'}</div>
         <div class="hidden-stems hidden-stems-btn" data-branch="${part.branch}" style="cursor:pointer;text-decoration:underline;text-decoration-style:dotted;">지장간 [${hidden}]</div>
         <div class="stage-tag${stage?' stage-btn':''}" ${stage?`data-stage="${stage}" style="cursor:pointer;"`:''}>${stage}</div>
+        ${sinsalHtml}
+        ${gwiinHtml}
+        ${gongmangHtml}
       </div>`;
   }
 
@@ -1572,6 +1680,21 @@
     if(s.hour) branchList.push({idx:s.hour.branch,label:'시지'});
     const rels = [...detectStemRelations(stemListForRel), ...detectRelations(branchList)];
     lines.push('형충회합: ' + (rels.length? rels.map(r=>`${r.pair.join('-')} ${r.type}`).join(', ') : '두드러진 관계 없음'));
+
+    // 공망·12신살·주요 신살(양인·괴강·백호)
+    const gm=gongmangBranches(s.day.stem, s.day.branch);
+    lines.push(`공망(空亡): ${gm.map(b=>BRANCH_HANJA[b]+'('+BRANCHES[b]+')').join(', ')}`);
+    const sMap=twelveSinsalMap(s.year.branch);
+    const sinsalParts=[['년지',s.year.branch],['월지',s.month.branch],['일지',s.day.branch]];
+    if(s.hour) sinsalParts.push(['시지',s.hour.branch]);
+    lines.push('12신살(년지 기준): ' + sinsalParts.map(([k,b])=>`${k}=${sMap[b]||'-'}`).join(', '));
+    const namedSinsal=detectNamedSinsal(s);
+    lines.push('주요 신살: ' + (namedSinsal.length? namedSinsal.join(', ') : '해당 없음'));
+    const gwiinMap=detectGwiinBranches(s);
+    const gwiinHits=sinsalParts.filter(([k,b])=>gwiinMap[b]&&gwiinMap[b].length).map(([k,b])=>`${k}=${gwiinMap[b].join('·')}`);
+    lines.push('귀인(천을귀인·문창귀인): ' + (gwiinHits.length? gwiinHits.join(', ') : '해당 없음'));
+    const gyeok=determineGyeokguk(s, dayStemIdx);
+    lines.push(`격국(참고, 간략화된 판정 — 파격·외격·종격은 미반영): ${gyeok.gyeokName} (${gyeok.note})`);
 
     // ---- 대운·세운·월운이 원국과 만나는 합·충·형·해를 앱이 직접 계산해서 AI에 전달 ----
     const ganji=(st,br)=>`${STEM_HANJA[st]}${BRANCH_HANJA[br]}(${STEMS[st]}${BRANCHES[br]})`;
