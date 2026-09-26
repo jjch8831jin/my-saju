@@ -2931,6 +2931,22 @@
     }
   }
 
+  const GEONJE_NAMES=['건','제','만','평','정','집','파','위','성','수','개','폐'];
+  const GEONJE_HANJA={건:'建',제:'除',만:'滿',평:'平',정:'定',집:'執',파:'破',위:'危',성:'成',수:'收',개:'開',폐:'閉'};
+  const GEONJE_GOOD_MOVING=['성','개','정','평'];
+  const DAEJANGGUN_GROUPS=[{branches:[11,0,1],dir:'동(東)'},{branches:[2,3,4],dir:'북(北)'},{branches:[5,6,7],dir:'서(西)'},{branches:[8,9,10],dir:'남(南)'}];
+  const SAMSAL_GROUPS=[{branches:[2,6,10],dir:'북(北)'},{branches:[5,9,1],dir:'동(東)'},{branches:[8,0,4],dir:'남(南)'},{branches:[11,3,7],dir:'서(西)'}];
+  function dirForYearBranch(groups,branch){ const g=groups.find(g=>g.branches.includes(branch)); return g?g.dir:''; }
+  function monthBranchForDate(y,m,day){
+    const jdUT=toJD(y,m,day,12-9), lon=sunLongitude(jdUT), adj=mod(lon-315,360), termIndex=Math.min(11,Math.floor(adj/30));
+    const monthBranchOrder=[2,3,4,5,6,7,8,9,10,11,0,1];
+    return monthBranchOrder[termIndex];
+  }
+  function yearBranchForDate(y,m,day){
+    const jdUT=toJD(y,m,day,12-9), ipchun=solarTermJD(315, toJD(y,2,4,0));
+    let pillarYear=y; if(jdUT<ipchun) pillarYear=y-1;
+    return mod(pillarYear-4,12);
+  }
   function scanUpcoming(days, filterFn){
     const results=[]; const today=new Date();
     const ty=today.getFullYear(), tm=today.getMonth()+1, td=today.getDate();
@@ -2940,8 +2956,10 @@
       const lunar=solarToLunar(y,m,day); if(!lunar) continue;
       const jdn=gregorianToJDN(y,m,day), idx=mod(jdn+49,60), dStem=mod(idx,10), dBranch=mod(idx,12);
       const info={y,m,day,lunar,dStem,dBranch,weekday:['일','월','화','수','목','금','토'][d.getUTCDay()],isToday:i===0};
-      const tag=filterFn(info);
-      if(tag) results.push({...info,tag});
+      const res=filterFn(info);
+      if(!res) continue;
+      if(typeof res==='object') results.push({...info, tag:res.tag, score:res.score||0, reasons:res.reasons||[]});
+      else results.push({...info,tag:res});
     }
     return results;
   }
@@ -2953,8 +2971,29 @@
       const myBranch=s.day.branch;
       filterFn=(info)=> hasPair(SIXHAP_P,myBranch,info.dBranch) ? '일지 육합' : null;
     } else if(kind==='moving'){
-      title='이사택일'; desc='전통적으로 널리 쓰이는 "손 없는 날"(음력 날짜 끝자리가 9 또는 0인 날)을 기준으로 안내합니다.';
-      filterFn=(info)=>{ const d=info.lunar.day; return (d%10===9 || d%10===0) ? '손 없는 날' : null; };
+      title='이사택일';
+      const td=new Date(), tyB=yearBranchForDate(td.getFullYear(), td.getMonth()+1, td.getDate());
+      const djDir=dirForYearBranch(DAEJANGGUN_GROUPS,tyB), ssDir=dirForYearBranch(SAMSAL_GROUPS,tyB);
+      desc = `"손 없는 날"·황도길일(건제십이신 중 성·개·정·평일)·본인 사주의 용신/희신에 맞는 날을 함께 보고, 겹치는 조건이 많은 날부터 보여드립니다. 유파에 따라 세부 기준이 다를 수 있는 참고용 결과입니다. 참고로 올해(${BRANCH_HANJA[tyB]}년)는 대장군 방위가 ${djDir}쪽, 삼살방이 ${ssDir}쪽이라고 전해지니, 그 방향으로 이사하거나 그쪽 방향의 집을 수리·공사하는 것은 전통적으로 피하는 게 좋다고 합니다.`;
+      filterFn=(info)=>{
+        const reasons=[]; let score=0;
+        const ld=info.lunar.day;
+        if(ld%10===9 || ld%10===0){ reasons.push(`손 없는 날(음력 ${ld}일)`); score+=1; }
+        const mB=monthBranchForDate(info.y, info.m, info.day), gIdx=mod(info.dBranch-mB,12), gName=GEONJE_NAMES[gIdx];
+        if(GEONJE_GOOD_MOVING.includes(gName)){ reasons.push(`건제법상 ${gName}일(${GEONJE_HANJA[gName]}日)`); score+=1; }
+        if(ys){
+          const elem=STEM_ELEM[info.dStem];
+          if(elem===ys.yong){ reasons.push(`본인 사주의 용신인 ${elem}(${ELEM_HANJA_MAP[elem]}) 기운의 날`); score+=1; }
+          else if(elem===ys.hui){ reasons.push(`본인 사주의 희신인 ${elem}(${ELEM_HANJA_MAP[elem]}) 기운의 날`); score+=0.5; }
+        }
+        if(reasons.length===0) return null;
+        const shortTags=[];
+        if(ld%10===9||ld%10===0) shortTags.push('손없는날');
+        if(GEONJE_GOOD_MOVING.includes(gName)) shortTags.push(`황도길일(${gName}일)`);
+        if(ys && STEM_ELEM[info.dStem]===ys.yong) shortTags.push('용신길일');
+        else if(ys && STEM_ELEM[info.dStem]===ys.hui) shortTags.push('희신길일');
+        return {tag: shortTags.join(' · '), score, reasons};
+      };
     } else {
       title='기도택일';
       desc='나의 사주(용신·희신)에 맞는 날짜만 추천합니다. 그중 전통 육재일(음력 8·14·15·23·29·30일)과 겹치는 날은 특히 좋은 날로 강조해요.';
@@ -2974,6 +3013,9 @@
         const tag = isJaeil ? `${item.tag} · 육재일 겹침` : item.tag;
         return {...item, tag, great: isJaeil};
       }).sort((a,b)=> (a.great===b.great?0:(a.great?-1:1)) || (new Date(a.y,a.m-1,a.day) - new Date(b.y,b.m-1,b.day)));
+    } else if(kind==='moving'){
+      list = list.map(item=>({...item, great: item.score>=2}))
+                 .sort((a,b)=> (b.score-a.score) || (new Date(a.y,a.m-1,a.day) - new Date(b.y,b.m-1,b.day)));
     }
     list = list.slice(0,limit);
     let html=`<h4>${title}</h4><p>${desc}</p>`;
@@ -2984,9 +3026,16 @@
     else {
       html+='<div class="date-list">'+list.map(item=>{
         const gz=STEM_HANJA[item.dStem]+BRANCH_HANJA[item.dBranch];
-        const itemStyle = (kind==='prayer' && item.great) ? ' style="background:rgba(43,58,103,0.08);border-color:rgba(43,58,103,0.4);"' : '';
-        const tagStyle = (kind==='prayer' && item.great) ? ' style="color:#2b3a67;"' : '';
-        return `<div class="date-item"${itemStyle}><span>${item.y}.${item.m}.${item.day} (${item.weekday})${item.isToday?' 오늘':''} · 일진 ${gz} · 음력 ${item.lunar.month}${item.lunar.isLeap?'(윤)':''}.${item.lunar.day}</span><span class="dtag"${tagStyle}>${item.tag}</span></div>`;
+        const isGreat = (kind==='prayer'||kind==='moving') && item.great;
+        const boxStyle = (isGreat ? 'background:rgba(43,58,103,0.08);border-color:rgba(43,58,103,0.4);' : '') + (kind==='moving' ? 'display:block;' : '');
+        const itemStyle = boxStyle ? ` style="${boxStyle}"` : '';
+        const tagStyle = isGreat ? ' style="color:#2b3a67;"' : '';
+        const headLine = `${item.y}.${item.m}.${item.day} (${item.weekday})${item.isToday?' 오늘':''} · 일진 ${gz} · 음력 ${item.lunar.month}${item.lunar.isLeap?'(윤)':''}.${item.lunar.day}`;
+        if(kind==='moving'){
+          const expl = item.reasons && item.reasons.length ? (item.reasons.join('이고, ') + `이라서${item.great?' 특히':''} 좋은 날로 골랐습니다.`) : '';
+          return `<div class="date-item"${itemStyle}><div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:6px;"><span>${headLine}</span><span class="dtag"${tagStyle}>${item.tag}</span></div><div style="font-size:11.5px;color:var(--ink-soft);margin-top:4px;line-height:1.5;">${expl}</div></div>`;
+        }
+        return `<div class="date-item"${itemStyle}><span>${headLine}</span><span class="dtag"${tagStyle}>${item.tag}</span></div>`;
       }).join('')+'</div>';
     }
     document.getElementById('panel-'+kind).innerHTML = html;
