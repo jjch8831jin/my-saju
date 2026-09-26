@@ -289,17 +289,6 @@
     <button class="go-btn" id="btnGo">사주 계산하기</button>
   </div>
 
-  <div class="tabs" id="tabs">
-    <button type="button" class="tab-btn" data-tab="reading">사주풀이</button>
-    <button type="button" class="tab-btn" data-tab="compat">궁합</button>
-    <button type="button" class="tab-btn" data-tab="fortune">운세</button>
-    <button type="button" class="tab-btn" data-tab="wedding">결혼택일</button>
-    <button type="button" class="tab-btn" data-tab="moving">이사택일</button>
-    <button type="button" class="tab-btn" data-tab="prayer">기도택일</button>
-    <button type="button" class="tab-btn" data-tab="zodiac">별자리</button>
-    <button type="button" class="tab-btn" data-tab="qna">실시간 Q&amp;A</button>
-  </div>
-  <p class="note keep-size" id="introNote" style="margin-top:14px; font-size:10pt;">먼저 위에서 사주를 계산한 뒤, 위 버튼을 누르면 팝업창으로 해당 풀이를 볼 수 있어요.</p>
   <div class="fold-card" style="margin-bottom:12px;">
     <div class="fold-head" style="display:flex; align-items:center; gap:10px; cursor:pointer; min-width:0; padding:13px; background:#3d7a5c; color:#ffffff; border:1px solid #2f6148; border-radius:8px; font-weight:700; letter-spacing:0.04em;">
       <span class="fold-caret" style="flex:none; font-size:14pt;">▸</span>
@@ -347,6 +336,19 @@
       <button type="button" id="btnEditApply" class="go-btn" style="flex:1; background:#3d7a5c; border-color:#3d7a5c;">적용하기</button>
       <button type="button" id="btnEditCancel" class="go-btn" style="flex:0 0 auto; background:#fffdf7; color:var(--ink); border-color:var(--rule);">취소</button>
     </div>
+
+    <div class="tabs" id="tabs">
+      <button type="button" class="tab-btn" data-tab="reading">사주풀이</button>
+      <button type="button" class="tab-btn" data-tab="compat">궁합</button>
+      <button type="button" class="tab-btn" data-tab="fortune">운세</button>
+      <button type="button" class="tab-btn" data-tab="wedding">결혼택일</button>
+      <button type="button" class="tab-btn" data-tab="moving">이사택일</button>
+      <button type="button" class="tab-btn" data-tab="prayer">기도택일</button>
+      <button type="button" class="tab-btn" data-tab="zodiac">별자리</button>
+      <button type="button" class="tab-btn" data-tab="qna">실시간 Q&amp;A</button>
+    </div>
+    <p class="note keep-size" id="introNote" style="margin-top:14px; margin-bottom:22px; font-size:10pt;">위 버튼을 누르면 팝업창으로 해당 풀이를 볼 수 있어요.</p>
+
     <div class="balance"><h3>오행 분포</h3><div class="bar" id="bar"></div><div class="legend" id="legend"></div></div>
 
     <div class="panel" id="relPanel">
@@ -373,25 +375,30 @@
     </div>
 
     <div class="panel" id="aiKeyPanel">
-      <h3>AI 심층 풀이 설정 (Gemini API 키)</h3>
-      <p style="font-size:12.5px;color:var(--ink-soft);line-height:1.7;margin:0 0 10px;">
-        아래 각 탭의 'AI 심층 풀이' 버튼은 직접 발급받은 Google Gemini API 키로 작동합니다. 키를 여러 개 등록해 두면, 한 키가 하루 사용 한도에 걸렸을 때 자동으로 다음 키로 넘어가서 계속 쓸 수 있어요. 키는 이 브라우저에만 저장되고 이 HTML 파일 자체나 서버로는 전송되지 않으며, 언제든 삭제할 수 있어요.
-      </p>
-      <div id="keyList" style="display:flex; flex-direction:column; gap:6px; margin-bottom:10px;"></div>
-      <div class="mini-form">
-        <div class="field" style="flex:2;">
-          <label style="font-size:11px;color:var(--ink-soft);">Gemini API 키 추가 (최대 5개, 서로 다른 계정의 키를 넣으면 한도를 따로 써요)</label>
-          <input type="password" id="geminiKey" placeholder="AIza..." style="font-family:inherit;font-size:13.5px;padding:9px 10px;border:1px solid var(--rule);border-radius:8px;background:#fffdf7;width:100%;">
+      <div style="display:flex; align-items:center; justify-content:space-between; gap:10px; flex-wrap:wrap;">
+        <h3 style="margin:0;">AI 심층 풀이 설정 (Gemini API 키)</h3>
+        <button type="button" id="aiKeyPanelToggle" class="go-btn" style="width:auto; padding:7px 14px; font-size:12px; background:#fffdf7; color:var(--ink); border-color:var(--rule);">🔑 API 키 설정 열기</button>
+      </div>
+      <div id="aiKeyPanelBody" style="display:none; margin-top:10px;">
+        <p style="font-size:12.5px;color:var(--ink-soft);line-height:1.7;margin:0 0 10px;">
+          아래 각 탭의 'AI 심층 풀이' 버튼은 직접 발급받은 Google Gemini API 키로 작동합니다. 키를 여러 개 등록해 두면, 한 키가 하루 사용 한도에 걸렸을 때 자동으로 다음 키로 넘어가서 계속 쓸 수 있어요. 키는 이 브라우저에만 저장되고 이 HTML 파일 자체나 서버로는 전송되지 않으며, 언제든 삭제할 수 있어요.
+        </p>
+        <div id="keyList" style="display:flex; flex-direction:column; gap:6px; margin-bottom:10px;"></div>
+        <div class="mini-form">
+          <div class="field" style="flex:2;">
+            <label style="font-size:11px;color:var(--ink-soft);">Gemini API 키 추가 (최대 5개, 서로 다른 계정의 키를 넣으면 한도를 따로 써요)</label>
+            <input type="password" id="geminiKey" placeholder="AIza..." style="font-family:inherit;font-size:13.5px;padding:9px 10px;border:1px solid var(--rule);border-radius:8px;background:#fffdf7;width:100%;">
+          </div>
         </div>
+        <div style="display:flex; gap:8px; margin-top:2px;">
+          <button type="button" id="keySaveBtn" class="go-btn" style="flex:1;">키 추가</button>
+        </div>
+        <div class="ai-error" id="keyTestError" style="margin-top:8px;"></div>
+        <div style="margin-top:8px; display:none; font-size:12.5px; color:#3d7a5c; font-weight:700;" id="keyTestSuccess"></div>
+        <div class="ai-loading" id="keyTestLoading" style="margin-top:8px;">키를 확인하고 있어요...</div>
+        <p style="font-size:11.5px;color:var(--ink-soft);margin:10px 0 0;">키가 없다면 <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener" style="color:var(--seal);">Google AI Studio</a>에서 무료로 발급받을 수 있어요.</p>
+        <button type="button" id="btnViewSource" class="go-btn" style="margin-top:14px; background:#f7c896; color:#7a4a10; border-color:#e8a860;">&lt;/&gt; 이 페이지 소스보기</button>
       </div>
-      <div style="display:flex; gap:8px; margin-top:2px;">
-        <button type="button" id="keySaveBtn" class="go-btn" style="flex:1;">키 추가</button>
-      </div>
-      <div class="ai-error" id="keyTestError" style="margin-top:8px;"></div>
-      <div style="margin-top:8px; display:none; font-size:12.5px; color:#3d7a5c; font-weight:700;" id="keyTestSuccess"></div>
-      <div class="ai-loading" id="keyTestLoading" style="margin-top:8px;">키를 확인하고 있어요...</div>
-      <p style="font-size:11.5px;color:var(--ink-soft);margin:10px 0 0;">키가 없다면 <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener" style="color:var(--seal);">Google AI Studio</a>에서 무료로 발급받을 수 있어요.</p>
-      <button type="button" id="btnViewSource" class="go-btn" style="margin-top:14px; background:#f7c896; color:#7a4a10; border-color:#e8a860;">&lt;/&gt; 이 페이지 소스보기</button>
     </div>
 
     <p class="disclaimer">일간(日干)은 나 자신을 상징하는 글자로, 사주 해석의 기준점이 됩니다. 십신·십이운성·용신은 일간을 기준으로 계산되며, 용신 판정은 억부법을 단순화한 참고용 추정입니다. 대운수와 대운 시작일은 근사치입니다(3일=1년 환산, 연 365.25일 기준). 년주·월주는 태양 황경(절기) 기준으로 정밀 계산되며, 진태양시 보정은 일주 경계(23시 기준)와 시주에만 적용됩니다(기본 동경 127.5도, -30분). 실제 출생지의 정확한 경도에 따른 세부 보정(도시별 차이)은 반영하지 않았습니다. 사주풀이·궁합·택일 결과(규칙 기반 및 AI 생성 모두)는 참고용 콘텐츠이며 전문 상담을 대체하지 않습니다. AI 심층 풀이는 외부 API 호출로 생성되며 응답에 다소 시간이 걸릴 수 있습니다.</p>
@@ -1728,6 +1735,17 @@
   selShi.addEventListener('change',applyShiChoice);
   document.getElementById('chkTrueSolar').addEventListener('change',()=>{ buildShiOptions(); applyShiChoice(); });
   buildShiOptions();
+
+  // ---- API 키 설정 영역 접기/펼치기 ----
+  (function(){
+    const toggle=document.getElementById('aiKeyPanelToggle'), body=document.getElementById('aiKeyPanelBody');
+    if(!toggle||!body) return;
+    toggle.addEventListener('click',()=>{
+      const open = body.style.display==='none';
+      body.style.display = open ? 'block' : 'none';
+      toggle.textContent = open ? '🔑 API 키 설정 접기' : '🔑 API 키 설정 열기';
+    });
+  })();
 
   // ---- API 키 목록 UI ----
   const geminiKeyInput=document.getElementById('geminiKey');
