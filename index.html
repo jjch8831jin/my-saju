@@ -897,12 +897,46 @@
   // 천을귀인·문창귀인: 일간 기준으로 어느 지지에 해당하는지 (일간 자신은 제외, 년/월/일/시지만 확인)
   const CHEONEUL_MAP={0:[1,7],4:[1,7],6:[1,7], 1:[0,8],5:[0,8], 2:[11,9],3:[11,9], 7:[2,6], 8:[3,5],9:[3,5]};
   const MUNCHANG_MAP={0:5,1:6,2:8,3:9,4:8,5:9,6:11,7:0,8:2,9:3};
+  const AMROK_MAP={0:11,1:10,2:8,3:7,4:8,5:7,6:5,7:4,8:2,9:1}; // 암록: 일간의 건록과 육합하는 지지
+  const GEUMYEO_MAP={0:4,1:5,2:7,3:8,4:7,5:8,6:10,7:11,8:1,9:2}; // 금여(金輿)
+  const WOLDEOK_MAP={화국:2,금국:6,수국:8,목국:0}; // 월지의 삼합국 기준 양간: 인오술(화국)→병, 사유축(금국)→경, 신자진(수국)→임, 해묘미(목국)→갑
+  function woldeokStemForBranch(branch){
+    const g=SAMHAP_GROUPS.find(g=>g.set.includes(branch));
+    return g ? WOLDEOK_MAP[g.name] : null;
+  }
+  function detectWoldeok(s){
+    const wStem=woldeokStemForBranch(s.month.branch);
+    if(wStem===null) return false;
+    const stems=[s.year.stem, s.month.stem, s.day.stem];
+    if(s.hour) stems.push(s.hour.stem);
+    return stems.includes(wStem);
+  }
+  // 천의성(天醫星): 월지 바로 앞 지지가 사주(월지 제외 다른 자리)에 있으면 성립
+  function detectCheonuiseong(s){
+    const target=mod(s.month.branch-1,12);
+    const others=[s.year.branch, s.day.branch];
+    if(s.hour) others.push(s.hour.branch);
+    return others.includes(target);
+  }
+  // 삼재(三災): 년지의 삼합국 기준으로, 다음 방합 그룹의 3개 연도가 삼재년
+  const SAMJAE_TARGET_GROUP={화국:[8,9,10],금국:[11,0,1],수국:[2,3,4],목국:[5,6,7]};
+  function samjaeInfo(personYearBranch, targetYear){
+    const g=SAMHAP_GROUPS.find(g=>g.set.includes(personYearBranch));
+    if(!g) return null;
+    const yearsGroup=SAMJAE_TARGET_GROUP[g.name];
+    const tyBranch=mod(targetYear-4,12);
+    const pos=yearsGroup.indexOf(tyBranch);
+    if(pos===-1) return null;
+    return { label: ['들삼재(입삼재)','눌삼재(침삼재)','날삼재(출삼재)'][pos] };
+  }
   function detectGwiinBranches(s){
     const dSt=s.day.stem;
     const targets={};
     const add=(list,name)=>{ (list||[]).forEach(b=>{ targets[b]=targets[b]||[]; targets[b].push(name); }); };
     add(CHEONEUL_MAP[dSt], '천을귀인');
     if(MUNCHANG_MAP[dSt]!==undefined) add([MUNCHANG_MAP[dSt]], '문창귀인');
+    if(AMROK_MAP[dSt]!==undefined) add([AMROK_MAP[dSt]], '암록');
+    if(GEUMYEO_MAP[dSt]!==undefined) add([GEUMYEO_MAP[dSt]], '금여');
     return targets; // branch idx -> [이름들]
   }
   const STEM_HAP_P=[[0,5,'토'],[1,6,'금'],[2,7,'수'],[3,8,'목'],[4,9,'화']]; // 갑기합토·을경합금·병신합수·정임합목·무계합화
@@ -1369,6 +1403,8 @@
     pillarsEl.innerHTML=html;
     pillarsEl.style.gridTemplateColumns=`repeat(${extra.length+4},1fr)`;
     const named=detectNamedSinsal(s);
+    if(detectWoldeok(s)) named.push('월덕귀인');
+    if(detectCheonuiseong(s)) named.push('천의성');
     const gyeok=determineGyeokguk(s, dayStemIdx, assessStrength(s, dayStemIdx).ratio);
     const gmLabel=gongmang.map(b=>BRANCH_HANJA[b]).join('·');
     let noteHtml = `<span>공망(空亡): ${gmLabel}</span>`;
@@ -1707,6 +1743,8 @@
     if(s.hour) sinsalParts.push(['시지',s.hour.branch]);
     lines.push('12신살(년지 기준): ' + sinsalParts.map(([k,b])=>`${k}=${sMap[b]||'-'}`).join(', '));
     const namedSinsal=detectNamedSinsal(s);
+    if(detectWoldeok(s)) namedSinsal.push('월덕귀인');
+    if(detectCheonuiseong(s)) namedSinsal.push('천의성');
     lines.push('주요 신살: ' + (namedSinsal.length? namedSinsal.join(', ') : '해당 없음'));
     const gwiinMap=detectGwiinBranches(s);
     const gwiinHits=sinsalParts.filter(([k,b])=>gwiinMap[b]&&gwiinMap[b].length).map(([k,b])=>`${k}=${gwiinMap[b].join('·')}`);
@@ -2816,26 +2854,35 @@
     const idx=mod(nowYear-4,60), stem=mod(idx,10), branch=mod(idx,12), elem=STEM_ELEM[stem];
     const tg=tenGod(dayStemIdx, elem, stem%2===0), branchElem=BRANCH_ELEM[branch], branchTg=tenGod(dayStemIdx, branchElem, branch%2===0);
     const nowMonth=new Date().getMonth()+1;
+    const baseBranchList=[{idx:s.year.branch,label:'년지'},{idx:s.month.branch,label:'월지'},{idx:s.day.branch,label:'일지'}];
+    if(s.hour) baseBranchList.push({idx:s.hour.branch,label:'시지'});
     let monthRows='';
     for(let m=1;m<=12;m++){
       const ms=computeSaju(nowYear, m, 15, 12, 0, false, false).month;
       const mtg=tenGod(dayStemIdx, STEM_ELEM[ms.stem], ms.stem%2===0), mbtg=tenGod(dayStemIdx, BRANCH_ELEM[ms.branch], ms.branch%2===0);
       const isCur=m===nowMonth;
-      const itemStyle=isCur?' style="background:rgba(43,58,103,0.08);border-color:rgba(43,58,103,0.4);"':'';
+      const boxStyle=(isCur?'background:rgba(43,58,103,0.08);border-color:rgba(43,58,103,0.4);':'')+'display:block;';
       const tagStyle=isCur?' style="color:#2b3a67;"':'';
-      monthRows += `<div class="date-item"${itemStyle}><span>${m}월${isCur?' (이번 달)':''} · ${STEM_HANJA[ms.stem]}${BRANCH_HANJA[ms.branch]}(${STEMS[ms.stem]}${BRANCHES[ms.branch]})</span><span class="dtag"${tagStyle}>천간 ${mtg} · 지지 ${mbtg}</span></div>`;
+      const monthRels=detectRelations([...baseBranchList,{idx:ms.branch,label:'월운'}]).filter(r=>r.pair.includes('월운'));
+      const relLabel = monthRels.length ? monthRels.map(r=>r.type).join('·') : '';
+      monthRows += `<div class="date-item" style="${boxStyle}"><div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:6px;"><span>${m}월${isCur?' (이번 달)':''} · ${STEM_HANJA[ms.stem]}${BRANCH_HANJA[ms.branch]}(${STEMS[ms.stem]}${BRANCHES[ms.branch]})</span><span class="dtag"${tagStyle}>천간 ${mtg} · 지지 ${mbtg}</span></div>${relLabel?`<div style="font-size:11.5px;color:var(--ink-soft);margin-top:2px;">원국과 ${relLabel}</div>`:''}</div>`;
     }
+    const samjae=samjaeInfo(s.year.branch, nowYear);
+    const samjaeHtml = samjae
+      ? `<p style="font-size:12.5px;color:var(--seal);">삼재(三災): <b>${samjae.label}</b>에 해당합니다.</p>`
+      : `<p style="font-size:12.5px;color:var(--ink-soft);">삼재(三災): 올해는 삼재에 해당하지 않습니다.</p>`;
     document.getElementById('panel-fortune').innerHTML = `
       <h4>${nowYear}년 운세</h4>
       <p>${nowYear}년의 해운(歲運)은 <b>${STEM_HANJA[stem]}${BRANCH_HANJA[branch]}(${STEMS[stem]}${BRANCHES[branch]})</b>, 일간을 기준으로 한 십신은 천간 <b>${tg}</b> · 지지 <b>${branchTg}</b>입니다.</p>
       <p>${TENGOD_DESC[tg]}</p><p>${TENGOD_DESC[branchTg]}</p>
+      ${samjaeHtml}
       <p style="color:var(--ink-soft); font-size:12px;">※ 더 정확한 월별 흐름은 위쪽 '세운' 표와 '대운'을 함께 참고하세요.</p>
       <button class="ai-btn" id="aiFortuneBtn">AI 심층 운세 보기</button>
       <div class="ai-loading" id="aiFortuneLoading">AI가 올해 운세를 분석하고 있어요...</div>
       <div class="ai-error" id="aiFortuneError"></div>
       <div class="ai-box" id="aiFortuneBox"></div>
       <h5 style="margin-top:22px;">${nowYear}년 월운(月運) 요약</h5>
-      <p style="font-size:12.5px;color:var(--ink-soft);">양력 1~12월 각 달의 월주(月柱)와 일간 기준 십신을 정리했습니다. 절기 기준으로 계산되어, 달이 바뀌는 절입일 전후로는 실제 월운이 하루이틀 어긋날 수 있습니다.</p>
+      <p style="font-size:12.5px;color:var(--ink-soft);">양력 1~12월 각 달의 월주(月柱)·일간 기준 십신·원국과의 형충회합을 정리했습니다. 절기 기준으로 계산되어, 달이 바뀌는 절입일 전후로는 실제 월운이 하루이틀 어긋날 수 있습니다.</p>
       <div class="date-list">${monthRows}</div>
     `;
     wireAI('aiFortuneBtn','aiFortuneLoading','aiFortuneError','aiFortuneBox', ()=>{
@@ -2846,7 +2893,9 @@
       for(let m=1;m<=12;m++){
         const ms=computeSaju(nowYear, m, 15, 12, 0, false, false).month;
         const mtg=tenGod(dayStemIdx, STEM_ELEM[ms.stem], ms.stem%2===0), mbtg=tenGod(dayStemIdx, BRANCH_ELEM[ms.branch], ms.branch%2===0);
-        monthLines.push(`${m}월: ${STEM_HANJA[ms.stem]}${BRANCH_HANJA[ms.branch]}(${STEMS[ms.stem]}${BRANCHES[ms.branch]}) — 천간 십신 ${mtg}, 지지 십신 ${mbtg}`);
+        const monthRels=detectRelations([...baseBranchList,{idx:ms.branch,label:'월운'}]).filter(r=>r.pair.includes('월운'));
+        const relText = monthRels.length ? ` | 원국과 ${monthRels.map(r=>r.type).join('·')}` : '';
+        monthLines.push(`${m}월: ${STEM_HANJA[ms.stem]}${BRANCH_HANJA[ms.branch]}(${STEMS[ms.stem]}${BRANCHES[ms.branch]}) — 천간 십신 ${mtg}, 지지 십신 ${mbtg}${relText}`);
       }
       const monthBlock = `\n\n[${nowYear}년 월운(月運) 1~12월 전체]\n${monthLines.join('\n')}`;
       return `다음은 한 사람의 사주 정보와 ${nowYear}년 세운 정보입니다.\n\n${summary}\n\n${nowYear}년 세운: ${STEM_HANJA[stem]}${BRANCH_HANJA[branch]} (천간 십신: ${tg}, 지지 십신: ${branchTg})${monthBlock}${ctxBlock}\n\n이 정보를 바탕으로 ${nowYear}년 한 해 운세를 구체적으로 한국어로 풀어서 작성해줘. 반드시 위에 적힌 현재 나이·인생 시기와 지금의 대운을 반영해서, 그 나이대의 실제 관심사(학업/취업/결혼/육아/자산관리/건강관리 등 나이에 맞는 주제)에 맞춰 써줘. 나이와 무관한 뻔한 이야기는 피해줘. 먼저 한 해 전체의 큰 흐름(재물운·애정·대인관계운·건강 유의사항)을 짚어준 뒤, 이어서 위에 적힌 1~12월 월운 데이터를 근거로 각 달(또는 흐름이 비슷한 몇 달을 묶어서)마다 그 달의 십신을 근거로 삼아 구체적으로 어떤 기운인지, 무엇을 조심하거나 기대해도 좋을지 월별로 빠짐없이 짚어줘. 분량 제한 없이 충분히 길고 깊이 있게 써줘. 문단을 나눠 읽기 편하게 쓰되, 소제목·번호 목록·마크다운 기호(** 등) 없이 일반 글로 작성해줘.`;
@@ -3005,13 +3054,34 @@
         `상대 일지(${BRANCH_HANJA[p.day.branch]})는 내 일간 기준 십신: ${tenGod(dayStemIdx, BRANCH_ELEM[p.day.branch], p.day.branch%2===0)}`,
         `내 일지(${BRANCH_HANJA[s.day.branch]})는 상대 일간 기준 십신: ${tenGod(p.day.stem, BRANCH_ELEM[s.day.branch], s.day.branch%2===0)}`
       ];
-      cpCtx = { myFull, partnerFull, crossLines, elemVerdict, elemText, branchVerdict, branchText };
+
+      // 나와 상대방, 두 사람 사이(여덟 글자끼리)의 형충회합만 따로 뽑아낸다 (각자 자기 원국 안의 관계는 제외)
+      const myBranchList=[{idx:s.year.branch,label:'나:년지'},{idx:s.month.branch,label:'나:월지'},{idx:s.day.branch,label:'나:일지'}];
+      if(s.hour) myBranchList.push({idx:s.hour.branch,label:'나:시지'});
+      const pBranchListX=[{idx:p.year.branch,label:'상대:년지'},{idx:p.month.branch,label:'상대:월지'},{idx:p.day.branch,label:'상대:일지'}];
+      if(p.hour) pBranchListX.push({idx:p.hour.branch,label:'상대:시지'});
+      const myStemList=[{idx:s.year.stem,label:'나:년간'},{idx:s.month.stem,label:'나:월간'},{idx:s.day.stem,label:'나:일간'}];
+      if(s.hour) myStemList.push({idx:s.hour.stem,label:'나:시간'});
+      const pStemListX=[{idx:p.year.stem,label:'상대:년간'},{idx:p.month.stem,label:'상대:월간'},{idx:p.day.stem,label:'상대:일간'}];
+      if(p.hour) pStemListX.push({idx:p.hour.stem,label:'상대:시간'});
+      const isCross=(r)=> r.pair.some(x=>x.startsWith('나:')) && r.pair.some(x=>x.startsWith('상대:'));
+      const crossRels=[
+        ...detectStemRelations([...myStemList,...pStemListX]).filter(isCross),
+        ...detectRelations([...myBranchList,...pBranchListX]).filter(isCross)
+      ];
+      const crossRelLines = crossRels.map(r=>`${r.pair.join('-')} ${r.type}`);
+
+      cpCtx = { myFull, partnerFull, crossLines, crossRelLines, elemVerdict, elemText, branchVerdict, branchText };
       cpQnaHistory = [];
 
       let cpPillarsHtml = pillarHTML('시주 · 時柱', p.hour, p.day.stem, false, pHasTime)
         + pillarHTML('일주 · 日柱', p.day, p.day.stem, true, true)
         + pillarHTML('월주 · 月柱', p.month, p.day.stem, false, true)
         + pillarHTML('년주 · 年柱', p.year, p.day.stem, false, true);
+
+      const crossRelHtml = crossRels.length
+        ? crossRels.map(relItemHTML).join('')
+        : '<p style="font-size:12.5px;color:var(--ink-soft);">나와 상대방의 여덟 글자 사이에 특별히 두드러진 형충회합 관계는 나타나지 않았습니다.</p>';
 
       document.getElementById('cpResult').innerHTML = `
         <h5>상대방 사주 원국</h5>
@@ -3020,6 +3090,8 @@
         <p>나: ${STEM_HANJA[dayStemIdx]}(${myElem}) · 상대: ${STEM_HANJA[p.day.stem]}(${partnerElem})<br>${elemText}</p>
         <h5>띠(년지) 궁합 — ${branchVerdict}</h5>
         <p>나: ${BRANCH_HANJA[myB]}(${BRANCHES[myB]}띠) · 상대: ${BRANCH_HANJA[pB]}(${BRANCHES[pB]}띠)<br>${branchText}</p>
+        <h5>두 사람 사이의 형충회합 (刑沖會合)</h5>
+        ${crossRelHtml}
         <button class="ai-btn" id="aiCompatBtn">AI 심층 궁합 풀이 보기</button>
         <div class="ai-loading" id="aiCompatLoading">AI가 두 사람의 궁합을 분석하고 있어요...</div>
         <div class="ai-error" id="aiCompatError"></div>
@@ -3039,7 +3111,8 @@
       wireAI('aiCompatBtn','aiCompatLoading','aiCompatError','aiCompatBox', ()=>{
         const ctx = (document.getElementById('ctxShared').value||'').trim();
         const ctxBlock = ctx ? `\n\n[질문자가 알려준 현재 상황]\n${ctx}\n\n위 상황은 질문자가 직접 알려준 사실이니 이것만 참고하고, 확인되지 않은 과거사를 새로 지어내거나 마치 미리 알고 있었던 것처럼 단정하지 마.` : '';
-        return `다음은 두 사람의 사주 정보입니다.\n\n[나의 사주]\n${myFull}\n\n[상대방의 사주]\n${partnerFull}\n\n[서로에 대한 십신 관계]\n${crossLines.join('\n')}\n\n[간단 궁합 결과]\n일간 오행 관계: ${elemVerdict} (${elemText})\n띠 관계: ${branchVerdict} (${branchText})${ctxBlock}\n\n이 정보를 바탕으로 두 사람의 궁합을 한국어로 구체적으로 풀어서 작성해줘. 두 사람의 십신(특히 서로에 대한 십신 관계와 각자 사주의 십신 분포)과 오행·용신 보완 관계를 근거로 삼아서, 서로 잘 맞는 부분과 유의하면 좋을 부분을 균형 있게 담아줘. 분량 제한 없이 충분히 길고 깊이 있게 써줘. 문단을 나눠 읽기 편하게 쓰되, 소제목·번호 목록·마크다운 기호(** 등) 없이 일반 글로 작성해줘.`;
+        const crossRelBlock = crossRelLines.length ? `\n\n[두 사람 사이의 형충회합]\n${crossRelLines.join('\n')}` : '\n\n[두 사람 사이의 형충회합]\n두드러진 관계 없음';
+        return `다음은 두 사람의 사주 정보입니다.\n\n[나의 사주]\n${myFull}\n\n[상대방의 사주]\n${partnerFull}\n\n[서로에 대한 십신 관계]\n${crossLines.join('\n')}${crossRelBlock}\n\n[간단 궁합 결과]\n일간 오행 관계: ${elemVerdict} (${elemText})\n띠 관계: ${branchVerdict} (${branchText})${ctxBlock}\n\n이 정보를 바탕으로 두 사람의 궁합을 한국어로 구체적으로 풀어서 작성해줘. 두 사람의 십신(특히 서로에 대한 십신 관계와 각자 사주의 십신 분포), 두 사람 사이의 형충회합, 오행·용신 보완 관계를 근거로 삼아서, 서로 잘 맞는 부분과 유의하면 좋을 부분을 균형 있게 담아줘. 분량 제한 없이 충분히 길고 깊이 있게 써줘. 문단을 나눠 읽기 편하게 쓰되, 소제목·번호 목록·마크다운 기호(** 등) 없이 일반 글로 작성해줘.`;
       });
 
       renderCpQnaHistory();
@@ -3085,12 +3158,13 @@
     renderCpQnaHistory();
 
     try{
-      const {myFull, partnerFull, crossLines, elemVerdict, elemText, branchVerdict, branchText} = cpCtx;
+      const {myFull, partnerFull, crossLines, crossRelLines, elemVerdict, elemText, branchVerdict, branchText} = cpCtx;
       const ctx = (document.getElementById('ctxShared').value||'').trim();
       const ctxBlock = ctx ? `\n\n[질문자가 알려준 현재 상황]\n${ctx}\n\n위 상황은 질문자가 직접 알려준 사실이니 이것만 참고하고, 확인되지 않은 과거사를 새로 지어내거나 마치 미리 알고 있었던 것처럼 단정하지 마.` : '';
       const past = cpQnaHistory.filter(it=>it!==item && it.a!=null).slice(-10).map((it,i)=>`Q${i+1}. ${it.q}\nA${i+1}. ${it.a}`).join('\n\n');
       const histBlock = past ? `\n\n[지금까지 나눈 대화]\n${past}\n\n위 대화를 기억하고 이어서 답해줘. 질문에 "그럼", "그 사람", "아까 말한 것"처럼 앞 내용을 가리키는 말이 있으면 위 대화에서 찾아 이해하고, 이미 설명한 내용은 반복하지 말고 이어서 새로운 내용을 답해줘.` : '';
-      const prompt = `다음은 두 사람의 사주 정보입니다.\n\n[나의 사주]\n${myFull}\n\n[상대방의 사주]\n${partnerFull}\n\n[서로에 대한 십신 관계]\n${crossLines.join('\n')}\n\n[간단 궁합 결과]\n일간 오행 관계: ${elemVerdict} (${elemText})\n띠 관계: ${branchVerdict} (${branchText})${ctxBlock}${histBlock}\n\n반드시 위 두 사람의 사주 정보(오행, 십신, 지장간, 십이운성, 형충회합, 용신, 대운 등)와 서로에 대한 십신 관계를 종합해서 아래 질문에 답변해줘. 두루뭉술하게 얼버무리지 말고, 명리학적으로 판단되는 결론을 첫 문장에서 직설적으로 먼저 제시한 뒤(예/아니오, 좋다/신중해야 한다, 잘 맞는다/유의해야 한다 등 명확한 입장), 두 사람의 사주의 어떤 요소 때문에 그렇게 판단하는지 구체적 근거를 이어서 설명해줘. 분량 제한 없이 충분히 깊이 있게 한국어로 답해줘. 문단을 나눠 읽기 편하게 쓰되, 소제목·번호 목록·마크다운 기호(** 등) 없이 일반 글로 작성해줘.\n\n질문: ${q}`;
+      const crossRelBlock = (crossRelLines&&crossRelLines.length) ? `\n\n[두 사람 사이의 형충회합]\n${crossRelLines.join('\n')}` : '\n\n[두 사람 사이의 형충회합]\n두드러진 관계 없음';
+      const prompt = `다음은 두 사람의 사주 정보입니다.\n\n[나의 사주]\n${myFull}\n\n[상대방의 사주]\n${partnerFull}\n\n[서로에 대한 십신 관계]\n${crossLines.join('\n')}${crossRelBlock}\n\n[간단 궁합 결과]\n일간 오행 관계: ${elemVerdict} (${elemText})\n띠 관계: ${branchVerdict} (${branchText})${ctxBlock}${histBlock}\n\n반드시 위 두 사람의 사주 정보(오행, 십신, 지장간, 십이운성, 형충회합, 용신, 대운 등)와 서로에 대한 십신 관계, 두 사람 사이의 형충회합을 종합해서 아래 질문에 답변해줘. 두루뭉술하게 얼버무리지 말고, 명리학적으로 판단되는 결론을 첫 문장에서 직설적으로 먼저 제시한 뒤(예/아니오, 좋다/신중해야 한다, 잘 맞는다/유의해야 한다 등 명확한 입장), 두 사람의 사주의 어떤 요소 때문에 그렇게 판단하는지 구체적 근거를 이어서 설명해줘. 분량 제한 없이 충분히 깊이 있게 한국어로 답해줘. 문단을 나눠 읽기 편하게 쓰되, 소제목·번호 목록·마크다운 기호(** 등) 없이 일반 글로 작성해줘.\n\n질문: ${q}`;
       const answer = await callClaude(prompt);
       item.a = answer||'답변을 받지 못했습니다.';
     } catch(e){
@@ -3238,6 +3312,8 @@
       if(ld%10===9 || ld%10===0){ reasons.push(`손 없는 날(음력 ${ld}일)`); score+=1; }
       const mB=monthBranchForDate(info.y, info.m, info.day), gIdx=mod(info.dBranch-mB,12), gName=GEONJE_NAMES[gIdx];
       if(GEONJE_GOOD_MOVING.includes(gName)){ reasons.push(`건제법상 ${gName}일(${GEONJE_HANJA[gName]}日)`); score+=1; }
+      const wdStem=woldeokStemForBranch(mB);
+      if(wdStem!==null && info.dStem===wdStem){ reasons.push(`월덕일(月德日, ${STEM_HANJA[wdStem]})`); score+=1; }
       exclSets.forEach((ex,i)=>{
         if(!ex.ys) return;
         const who = two ? (i===0?'나의 ':'상대방의 ') : '본인 사주의 ';
@@ -3275,7 +3351,7 @@
     const panel=document.getElementById('panel-wedding');
     panel.innerHTML = `
       <h4>결혼택일</h4>
-      <p>내 일지와 육합·삼합이 되는 날은 선호하고, 충·해(六害)·원진·형(자형·상형)·고신/과숙에 걸리는 날은 후보에서 제외하면서, 손 없는 날·황도길일(건제법)·용신/희신에 맞는 날까지 점수로 매겨 좋은 날부터 보여드립니다. 음양부장길일·가취월(혼인기피월)은 정확한 원전 표를 확인하지 못해 이번엔 반영하지 않았습니다. 전통 택일법은 유파마다 세부 기준이 달라 참고용으로만 봐주세요.</p>
+      <p>내 일지와 육합·삼합이 되는 날은 선호하고, 충·해(六害)·원진·형(자형·상형)·고신/과숙에 걸리는 날은 후보에서 제외하면서, 손 없는 날·황도길일(건제법)·월덕일(月德日)·용신/희신에 맞는 날까지 점수로 매겨 좋은 날부터 보여드립니다. 천덕일·음양부장길일·가취월(혼인기피월)은 정확한 원전 표를 확인하지 못해 이번엔 반영하지 않았습니다. 전통 택일법은 유파마다 세부 기준이 달라 참고용으로만 봐주세요.</p>
       <div class="mini-form">
         <div class="field" style="flex:0 0 220px;">
           <label style="font-size:11px;color:var(--ink-soft);">기준</label>
@@ -3441,7 +3517,7 @@
     return ZODIAC[0];
   }
   function renderZodiac(){
-    const {month,day,year,s,dayStemIdx,isMale:im,counts,strength,ys}=state; const z=getZodiac(month,day);
+    const {month,day,year}=state; const z=getZodiac(month,day);
     document.getElementById('panel-zodiac').innerHTML = `
       <h4>별자리</h4>
       <div class="zod-card"><div><div class="zod-name">${z.name} (${z.en})</div><div style="font-size:12px;color:var(--ink-soft);">${z.from[0]}월 ${z.from[1]}일 ~ ${z.to[0]}월 ${z.to[1]}일</div></div></div>
@@ -3453,8 +3529,12 @@
       <div class="ai-box" id="aiZodiacBox"></div>
     `;
     wireAI('aiZodiacBtn','aiZodiacLoading','aiZodiacError','aiZodiacBox', ()=>{
-      const summary = buildSajuSummary(s, dayStemIdx, im, counts, strength, ys, year, month, day);
-      return `다음은 한 사람의 사주 정보와 서양 별자리 정보입니다.\n\n${summary}\n별자리: ${z.name}(${z.en}), ${z.from[0]}월${z.from[1]}일~${z.to[0]}월${z.to[1]}일\n별자리 기본 성향: ${z.desc}\n\n이 정보를 바탕으로 동양 사주와 서양 별자리를 함께 참고한 심층 성격·성향 분석을 한국어로 작성해줘. 위에 적힌 현재 나이·인생 시기를 반영해서 그 나이대에 맞는 이야기로 풀어주고, 나이와 무관한 일반적인 성격 묘사만 나열하지는 말아줘. 두 체계에서 공통적으로 드러나는 특징과, 서로 다르게 보이는 지점을 자연스럽게 녹여서 분량 제한 없이 충분히 길고 깊이 있게 써줘. 문단을 나눠 읽기 편하게 쓰되, 소제목·번호 목록·마크다운 기호(** 등) 없이 일반 글로 작성해줘.`;
+      const nowYearForAge=new Date().getFullYear();
+      const koreanAge = year ? (nowYearForAge - year + 1) : null;
+      const ageLine = year ? `출생년도: ${year}년 (현재 만 나이 약 ${koreanAge-1}세, ${lifeStageLabel(koreanAge-1)})` : '';
+      const ctx = (document.getElementById('ctxShared').value||'').trim();
+      const ctxBlock = ctx ? `\n\n[질문자가 알려준 현재 상황]\n${ctx}\n\n위 상황은 질문자가 직접 알려준 사실이니 이것만 참고하고, 확인되지 않은 과거사를 새로 지어내거나 마치 미리 알고 있었던 것처럼 단정하지 마.` : '';
+      return `다음은 한 사람의 서양 별자리 정보입니다.\n\n${ageLine}\n별자리: ${z.name}(${z.en}), ${z.from[0]}월${z.from[1]}일~${z.to[0]}월${z.to[1]}일\n별자리 기본 성향: ${z.desc}${ctxBlock}\n\n이 정보를 바탕으로 서양 점성술(별자리) 관점에서 심층 성격·성향 분석을 한국어로 작성해줘. 사주(동양 명리)는 언급하지 말고 순수하게 서양 점성술 관점으로만 풀어줘. 위에 적힌 현재 나이·인생 시기를 반영해서 그 나이대에 맞는 이야기로 풀어주고, 나이와 무관한 일반적인 성격 묘사만 나열하지는 말아줘. 타고난 성격·강점과 약점·대인관계 스타일·연애 성향·지금 시기에 참고할 만한 조언을 분량 제한 없이 충분히 길고 깊이 있게 써줘. 문단을 나눠 읽기 편하게 쓰되, 소제목·번호 목록·마크다운 기호(** 등) 없이 일반 글로 작성해줘.`;
     });
   }
 
