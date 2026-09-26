@@ -2842,7 +2842,14 @@
       const summary = buildSajuSummary(s, dayStemIdx, im, counts, strength, ys, year, month, day);
       const ctx = (document.getElementById('ctxShared').value||'').trim();
       const ctxBlock = ctx ? `\n\n[질문자가 알려준 현재 상황]\n${ctx}\n\n위 상황은 질문자가 직접 알려준 사실이니 이것만 참고하고, 확인되지 않은 과거사를 새로 지어내거나 마치 미리 알고 있었던 것처럼 단정하지 마.` : '';
-      return `다음은 한 사람의 사주 정보와 ${nowYear}년 세운 정보입니다.\n\n${summary}\n\n${nowYear}년 세운: ${STEM_HANJA[stem]}${BRANCH_HANJA[branch]} (천간 십신: ${tg}, 지지 십신: ${branchTg})${ctxBlock}\n\n이 정보를 바탕으로 ${nowYear}년 한 해 운세를 구체적으로 한국어로 풀어서 작성해줘. 반드시 위에 적힌 현재 나이·인생 시기와 지금의 대운을 반영해서, 그 나이대의 실제 관심사(학업/취업/결혼/육아/자산관리/건강관리 등 나이에 맞는 주제)에 맞춰 써줘. 나이와 무관한 뻔한 이야기는 피해줘. 상반기/하반기 흐름, 재물운, 애정·대인관계운, 건강 유의사항을 포함해서 분량 제한 없이 충분히 길고 깊이 있게 써줘. 문단을 나눠 읽기 편하게 쓰되, 소제목·번호 목록·마크다운 기호(** 등) 없이 일반 글로 작성해줘.`;
+      const monthLines=[];
+      for(let m=1;m<=12;m++){
+        const ms=computeSaju(nowYear, m, 15, 12, 0, false, false).month;
+        const mtg=tenGod(dayStemIdx, STEM_ELEM[ms.stem], ms.stem%2===0), mbtg=tenGod(dayStemIdx, BRANCH_ELEM[ms.branch], ms.branch%2===0);
+        monthLines.push(`${m}월: ${STEM_HANJA[ms.stem]}${BRANCH_HANJA[ms.branch]}(${STEMS[ms.stem]}${BRANCHES[ms.branch]}) — 천간 십신 ${mtg}, 지지 십신 ${mbtg}`);
+      }
+      const monthBlock = `\n\n[${nowYear}년 월운(月運) 1~12월 전체]\n${monthLines.join('\n')}`;
+      return `다음은 한 사람의 사주 정보와 ${nowYear}년 세운 정보입니다.\n\n${summary}\n\n${nowYear}년 세운: ${STEM_HANJA[stem]}${BRANCH_HANJA[branch]} (천간 십신: ${tg}, 지지 십신: ${branchTg})${monthBlock}${ctxBlock}\n\n이 정보를 바탕으로 ${nowYear}년 한 해 운세를 구체적으로 한국어로 풀어서 작성해줘. 반드시 위에 적힌 현재 나이·인생 시기와 지금의 대운을 반영해서, 그 나이대의 실제 관심사(학업/취업/결혼/육아/자산관리/건강관리 등 나이에 맞는 주제)에 맞춰 써줘. 나이와 무관한 뻔한 이야기는 피해줘. 먼저 한 해 전체의 큰 흐름(재물운·애정·대인관계운·건강 유의사항)을 짚어준 뒤, 이어서 위에 적힌 1~12월 월운 데이터를 근거로 각 달(또는 흐름이 비슷한 몇 달을 묶어서)마다 그 달의 십신을 근거로 삼아 구체적으로 어떤 기운인지, 무엇을 조심하거나 기대해도 좋을지 월별로 빠짐없이 짚어줘. 분량 제한 없이 충분히 길고 깊이 있게 써줘. 문단을 나눠 읽기 편하게 쓰되, 소제목·번호 목록·마크다운 기호(** 등) 없이 일반 글로 작성해줘.`;
     });
   }
 
