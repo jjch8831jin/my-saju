@@ -1251,6 +1251,7 @@
     openStageDetail(btn.dataset.stage);
   });
   function openStageDetail(stageName){
+    rememberReturnPanel();
     document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
     document.querySelectorAll('.reading-panel').forEach(p=>p.classList.remove('show'));
     const panel=document.getElementById('panel-stage');
@@ -1273,6 +1274,7 @@
     `;
   }
   function openIlganDetail(stemIdx){
+    rememberReturnPanel();
     document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
     document.querySelectorAll('.reading-panel').forEach(p=>p.classList.remove('show'));
     const panel=document.getElementById('panel-ilgan');
@@ -1311,6 +1313,7 @@
     `;
   }
   function openTenGodDetail(tg){
+    rememberReturnPanel();
     document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
     document.querySelectorAll('.reading-panel').forEach(p=>p.classList.remove('show'));
     const panel=document.getElementById('panel-tengod');
@@ -1344,6 +1347,7 @@
     `;
   }
   function openHiddenStemsDetail(branchIdx){
+    rememberReturnPanel();
     document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
     document.querySelectorAll('.reading-panel').forEach(p=>p.classList.remove('show'));
     const panel=document.getElementById('panel-hidden');
@@ -2579,7 +2583,9 @@
   // ---------- 모달(오버레이) 팝업 ----------
   const modalOverlay=document.getElementById('modalOverlay');
   const modalClose=document.getElementById('modalClose');
+  let detailReturnPanelId=null; // 운세/궁합 등 안에서 십신·지장간·십이운성·일간 설명을 열었을 때, 닫기를 누르면 돌아갈 원래 패널
   function openModal(tab){
+    detailReturnPanelId=null;
     document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
     document.querySelectorAll('.reading-panel').forEach(p=>p.classList.remove('show'));
     const btn=document.querySelector('.tab-btn[data-tab="'+tab+'"]');
@@ -2593,13 +2599,39 @@
     modalOverlay.querySelector('.modal-scroll').scrollTop=0;
   }
   function closeModal(){
+    detailReturnPanelId=null;
     modalOverlay.classList.remove('open');
     modalOverlay.classList.remove('fullscreen');
     document.body.style.overflow='';
   }
-  modalClose.addEventListener('click', closeModal);
-  modalOverlay.addEventListener('click',(e)=>{ if(e.target===modalOverlay) closeModal(); });
-  document.addEventListener('keydown',(e)=>{ if(e.key==='Escape' && modalOverlay.classList.contains('open')) closeModal(); });
+  function closeOrGoBack(){
+    if(detailReturnPanelId){
+      const targetId=detailReturnPanelId;
+      detailReturnPanelId=null;
+      document.querySelectorAll('.reading-panel').forEach(p=>p.classList.remove('show'));
+      const panel=document.getElementById(targetId);
+      if(panel) panel.classList.add('show');
+      document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
+      const tabName=targetId.replace('panel-','');
+      const tabBtn=document.querySelector('.tab-btn[data-tab="'+tabName+'"]');
+      if(tabBtn) tabBtn.classList.add('active');
+      modalOverlay.classList.toggle('fullscreen', targetId==='panel-qna');
+      modalOverlay.querySelector('.modal-scroll').scrollTop=0;
+      return;
+    }
+    closeModal();
+  }
+  // 이미 모달이 열려 있는 상태(운세·궁합 등)에서 십신/지장간/십이운성/일간 설명을 열 때, 돌아갈 패널을 기억해둔다
+  function rememberReturnPanel(){
+    if(!modalOverlay.classList.contains('open')){ detailReturnPanelId=null; return; }
+    const shown=document.querySelector('.reading-panel.show');
+    if(shown && !['panel-tengod','panel-hidden','panel-stage','panel-ilgan'].includes(shown.id)){
+      detailReturnPanelId=shown.id;
+    }
+  }
+  modalClose.addEventListener('click', closeOrGoBack);
+  modalOverlay.addEventListener('click',(e)=>{ if(e.target===modalOverlay) closeOrGoBack(); });
+  document.addEventListener('keydown',(e)=>{ if(e.key==='Escape' && modalOverlay.classList.contains('open')) closeOrGoBack(); });
 
   // ---- 소스 보기 ----
   // ---- 저장된 사주 목록 ----
@@ -2983,8 +3015,14 @@
       const monthRels=detectRelations([...baseBranchList,{idx:ms.branch,label:'월운'}]).filter(r=>r.pair.includes('월운'));
       const stemTgHtml = mtg ? `<span class="tengod-btn" data-tg="${mtg}" style="cursor:pointer;text-decoration:underline;text-decoration-style:dotted;">${mtg}</span>` : '&nbsp;';
       const branchTgHtml = mbtg ? `<span class="tengod-btn" data-tg="${mbtg}" style="cursor:pointer;text-decoration:underline;text-decoration-style:dotted;">${mbtg}</span>` : '&nbsp;';
+      const mStage=twelveStage(dayStemIdx, ms.branch);
+      const descParts=[];
+      if(mtg && TENGOD_DESC[mtg]) descParts.push(TENGOD_DESC[mtg]);
+      if(mbtg && mbtg!==mtg && TENGOD_DESC[mbtg]) descParts.push(TENGOD_DESC[mbtg]);
+      const stageHtml = mStage ? ` 이 달의 십이운성은 <span class="stage-btn" data-stage="${mStage}" style="cursor:pointer;text-decoration:underline;text-decoration-style:dotted;font-weight:600;">${mStage}</span>입니다.` : '';
+      const descHtml = (descParts.length || stageHtml) ? `<div style="font-size:12px;color:var(--ink-soft);margin-top:5px;line-height:1.65;">${descParts.join(' ')}${stageHtml}</div>` : '';
       const relHtml = monthRels.length ? `<div style="margin-top:6px;">${monthRels.map(relItemHTML).join('')}</div>` : '';
-      monthRows += `<div class="date-item" style="${boxStyle}"><div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:6px;"><span>${m}월${isCur?' (이번 달)':''} · ${STEM_HANJA[ms.stem]}${BRANCH_HANJA[ms.branch]}(${STEMS[ms.stem]}${BRANCHES[ms.branch]})</span><span class="dtag"${tagStyle}>천간 ${stemTgHtml} · 지지 ${branchTgHtml}</span></div>${relHtml}</div>`;
+      monthRows += `<div class="date-item" style="${boxStyle}"><div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:6px;"><span>${m}월${isCur?' (이번 달)':''} · ${STEM_HANJA[ms.stem]}${BRANCH_HANJA[ms.branch]}(${STEMS[ms.stem]}${BRANCHES[ms.branch]})</span><span class="dtag"${tagStyle}>천간 ${stemTgHtml} · 지지 ${branchTgHtml}</span></div>${descHtml}${relHtml}</div>`;
     }
     const samjae=samjaeInfo(s.year.branch, nowYear);
     const samjaeHtml = samjae
