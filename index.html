@@ -2981,8 +2981,10 @@
       const boxStyle=(isCur?'background:rgba(43,58,103,0.08);border-color:rgba(43,58,103,0.4);':'')+'display:block;';
       const tagStyle=isCur?' style="color:#2b3a67;"':'';
       const monthRels=detectRelations([...baseBranchList,{idx:ms.branch,label:'월운'}]).filter(r=>r.pair.includes('월운'));
-      const relLabel = monthRels.length ? monthRels.map(r=>r.type).join('·') : '';
-      monthRows += `<div class="date-item" style="${boxStyle}"><div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:6px;"><span>${m}월${isCur?' (이번 달)':''} · ${STEM_HANJA[ms.stem]}${BRANCH_HANJA[ms.branch]}(${STEMS[ms.stem]}${BRANCHES[ms.branch]})</span><span class="dtag"${tagStyle}>천간 ${mtg} · 지지 ${mbtg}</span></div>${relLabel?`<div style="font-size:11.5px;color:var(--ink-soft);margin-top:2px;">원국과 ${relLabel}</div>`:''}</div>`;
+      const stemTgHtml = mtg ? `<span class="tengod-btn" data-tg="${mtg}" style="cursor:pointer;text-decoration:underline;text-decoration-style:dotted;">${mtg}</span>` : '&nbsp;';
+      const branchTgHtml = mbtg ? `<span class="tengod-btn" data-tg="${mbtg}" style="cursor:pointer;text-decoration:underline;text-decoration-style:dotted;">${mbtg}</span>` : '&nbsp;';
+      const relHtml = monthRels.length ? `<div style="margin-top:6px;">${monthRels.map(relItemHTML).join('')}</div>` : '';
+      monthRows += `<div class="date-item" style="${boxStyle}"><div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:6px;"><span>${m}월${isCur?' (이번 달)':''} · ${STEM_HANJA[ms.stem]}${BRANCH_HANJA[ms.branch]}(${STEMS[ms.stem]}${BRANCHES[ms.branch]})</span><span class="dtag"${tagStyle}>천간 ${stemTgHtml} · 지지 ${branchTgHtml}</span></div>${relHtml}</div>`;
     }
     const samjae=samjaeInfo(s.year.branch, nowYear);
     const samjaeHtml = samjae
@@ -3015,7 +3017,7 @@
         monthLines.push(`${m}월: ${STEM_HANJA[ms.stem]}${BRANCH_HANJA[ms.branch]}(${STEMS[ms.stem]}${BRANCHES[ms.branch]}) — 천간 십신 ${mtg}, 지지 십신 ${mbtg}${relText}`);
       }
       const monthBlock = `\n\n[${nowYear}년 월운(月運) 1~12월 전체]\n${monthLines.join('\n')}`;
-      return `다음은 한 사람의 사주 정보와 ${nowYear}년 세운 정보입니다.\n\n${summary}\n\n${nowYear}년 세운: ${STEM_HANJA[stem]}${BRANCH_HANJA[branch]} (천간 십신: ${tg}, 지지 십신: ${branchTg})${monthBlock}${ctxBlock}${expertGyeokGuidance()}\n\n이 정보를 바탕으로 ${nowYear}년 한 해 운세를 한국어로 작성해줘. 반드시 위에 적힌 현재 나이·인생 시기와 지금의 대운을 반영해서, 그 나이대의 실제 관심사(학업/취업/결혼/육아/자산관리/건강관리 등 나이에 맞는 주제)에 맞춰 써줘. 나이와 무관한 뻔한 이야기는 피해줘.\n\n[중요] 글을 하나로 죽 이어 쓰지 말고, 아래 항목별로 뚜렷하게 나눠서 써줘. 각 항목은 "◆ 항목 제목"을 단독으로 한 줄 쓴 뒤 한 줄을 비우고 그 아래에 내용을 쓰고, 항목과 항목 사이도 한 줄을 비워서 구분해줘 (마크다운 기호 **, #, - 같은 건 쓰지 말고 순수한 글자와 ◆ 표시만 사용해줘):\n\n◆ 올해 총평\n${nowYear}년 세운(${STEM_HANJA[stem]}${BRANCH_HANJA[branch]})이 이 사람의 원국·용신과 어떤 관계인지를 근거로, 올 한 해 전체의 큰 흐름을 짚어줘.\n\n◆ 재물운\n\n◆ 애정·대인관계운\n\n◆ 건강 유의사항\n\n◆ 월별 흐름\n위에 적힌 1~12월 월운 데이터를 근거로, 각 달(또는 흐름이 비슷한 몇 달을 묶어서)마다 그 달의 십신을 근거로 삼아 구체적으로 어떤 기운인지, 무엇을 조심하거나 기대해도 좋을지 월별로 빠짐없이 짚어줘.\n\n각 항목의 내용은 분량 제한 없이 충분히 깊이 있게 써주되, 항목 안에서도 문단을 나눠 읽기 편하게 써줘.`;
+      return `다음은 한 사람의 사주 정보와 ${nowYear}년 세운 정보입니다.\n\n${summary}\n\n${nowYear}년 세운: ${STEM_HANJA[stem]}${BRANCH_HANJA[branch]} (천간 십신: ${tg}, 지지 십신: ${branchTg})${monthBlock}${ctxBlock}${expertGyeokGuidance()}\n\n이 정보를 바탕으로 ${nowYear}년 한 해 운세를 한국어로 작성해줘. 반드시 위에 적힌 현재 나이·인생 시기와 지금의 대운을 반영해서, 그 나이대의 실제 관심사(학업/취업/결혼/육아/자산관리/건강관리 등 나이에 맞는 주제)에 맞춰 써줘. 나이와 무관한 뻔한 이야기는 피해줘. 1~12월 월운 데이터는 화면에 이미 별도의 표(月運 요약)로 나와 있으니, 달을 하나하나 다시 나열하거나 그 표를 반복하지 말고, 그 데이터가 보여주는 전반적인 흐름(예: 상반기/하반기 중 어느 쪽이 더 활발한지, 원국과 형충회합이 많은 시기가 몰려 있는지)을 재물운·애정운·건강 항목 안에 자연스럽게 녹여서 근거로만 활용해줘.\n\n[중요] 글을 하나로 죽 이어 쓰지 말고, 아래 항목별로 뚜렷하게 나눠서 써줘. 각 항목은 "◆ 항목 제목"을 단독으로 한 줄 쓴 뒤 한 줄을 비우고 그 아래에 내용을 쓰고, 항목과 항목 사이도 한 줄을 비워서 구분해줘 (마크다운 기호 **, #, - 같은 건 쓰지 말고 순수한 글자와 ◆ 표시만 사용해줘):\n\n◆ 올해 총평\n${nowYear}년 세운(${STEM_HANJA[stem]}${BRANCH_HANJA[branch]})이 이 사람의 원국·용신과 어떤 관계인지를 근거로, 올 한 해 전체의 큰 흐름을 짚어줘.\n\n◆ 재물운\n\n◆ 애정·대인관계운\n\n◆ 건강 유의사항\n\n각 항목의 내용은 분량 제한 없이 충분히 깊이 있게 써주되, 항목 안에서도 문단을 나눠 읽기 편하게 써줘.`;
     });
   }
 
