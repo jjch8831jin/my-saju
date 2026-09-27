@@ -3178,6 +3178,7 @@
 
   function renderFortune(){
     const {dayStemIdx, s, isMale:im, counts, strength, ys, year, month, day} = state;
+    const nowYear=new Date().getFullYear();
     const idx=mod(nowYear-4,60), stem=mod(idx,10), branch=mod(idx,12), elem=STEM_ELEM[stem];
     const tg=tenGod(dayStemIdx, elem, stem%2===0), branchElem=BRANCH_ELEM[branch], branchTg=tenGod(dayStemIdx, branchElem, branch%2===0);
     const nowMonth=new Date().getMonth()+1;
