@@ -203,7 +203,7 @@
   }
   .modal-minimize:hover{ background:var(--gold); color:#fff; border-color:var(--gold); }
   .minimized-taskbar{
-    position:fixed; left:0; right:0; bottom:0; z-index:500; display:none;
+    position:fixed; left:0; right:0; bottom:0; z-index:1200; display:none;
     background:var(--paper); border-top:1px solid var(--rule); padding:8px 12px;
     gap:8px; flex-wrap:wrap; box-shadow:0 -4px 16px rgba(0,0,0,0.15);
   }
@@ -2686,8 +2686,18 @@
   function restoreMinimized(panelId){
     const idx=minimizedPanels.findIndex(m=>m.panelId===panelId);
     if(idx===-1) return;
-    const item=minimizedPanels[idx];
-    minimizedPanels.splice(idx,1);
+    // 다른 팝업이 이미 열려 있는 상태에서 최소화 목록의 다른 항목을 누르면, 지금 보던 것부터 자동으로 최소화해서 잃어버리지 않게 한다
+    if(modalOverlay.classList.contains('open')){
+      const shown=document.querySelector('.reading-panel.show');
+      if(shown && shown.id!==panelId && !minimizedPanels.some(m=>m.panelId===shown.id)){
+        const scrollEl=modalOverlay.querySelector('.modal-scroll');
+        minimizedPanels.push({ panelId:shown.id, label: PANEL_LABELS[shown.id]||shown.id.replace('panel-',''), scrollTop: scrollEl?scrollEl.scrollTop:0 });
+      }
+    }
+    const idx2=minimizedPanels.findIndex(m=>m.panelId===panelId);
+    const item=minimizedPanels[idx2];
+    minimizedPanels.splice(idx2,1);
+    detailReturnPanelId=null;
     document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
     document.querySelectorAll('.reading-panel').forEach(p=>p.classList.remove('show'));
     const panel=document.getElementById(item.panelId);
