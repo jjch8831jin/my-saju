@@ -196,6 +196,28 @@
     cursor:pointer; color:var(--ink-soft); z-index:10;
   }
   .modal-close:hover{ background:var(--seal); color:#fff; border-color:var(--seal); }
+  .modal-minimize{
+    position:absolute; top:14px; right:56px; width:34px; height:34px; border-radius:50%;
+    border:1px solid var(--rule); background:#fffdf7; font-size:18px; line-height:1;
+    cursor:pointer; color:var(--ink-soft); z-index:10;
+  }
+  .modal-minimize:hover{ background:var(--gold); color:#fff; border-color:var(--gold); }
+  .minimized-taskbar{
+    position:fixed; left:0; right:0; bottom:0; z-index:500; display:none;
+    background:var(--paper); border-top:1px solid var(--rule); padding:8px 12px;
+    gap:8px; flex-wrap:wrap; box-shadow:0 -4px 16px rgba(0,0,0,0.15);
+  }
+  .minimized-taskbar.show{ display:flex; }
+  .min-pill{
+    display:flex; align-items:center; gap:6px; background:#fffdf7; border:1px solid var(--rule);
+    border-radius:20px; padding:7px 6px 7px 14px; font-size:13px; cursor:pointer; color:var(--ink);
+  }
+  .min-pill:hover{ border-color:var(--seal); }
+  .min-pill-x{
+    width:20px; height:20px; border-radius:50%; display:flex; align-items:center; justify-content:center;
+    color:var(--ink-soft); font-size:13px; flex:0 0 auto;
+  }
+  .min-pill-x:hover{ background:var(--seal); color:#fff; }
   .modal-scroll{ max-height:calc(90vh - 28px); overflow-y:auto; padding-right:4px; }
   .modal-box .reading-panel{ margin-top:0; }
   .modal-box, .modal-box p, .modal-box li, .modal-box .rel-item, .modal-box .ys-item,
@@ -408,6 +430,7 @@
 
 <div class="modal-overlay" id="modalOverlay">
   <div class="modal-box">
+    <button type="button" class="modal-minimize" id="modalMinimize" aria-label="최소화" title="최소화">－</button>
     <button type="button" class="modal-close" id="modalClose" aria-label="닫기">×</button>
     <div class="modal-scroll">
       <div class="panel reading-panel" id="panel-reading"></div>
@@ -429,6 +452,7 @@
     </div>
   </div>
 </div>
+<div class="minimized-taskbar" id="minimizedTaskbar"></div>
 
 
 <script>
@@ -2494,6 +2518,7 @@
 
     state = {s, dayStemIdx, counts, total, year, month, day, hour, minute, hasTime, isMale:im, strength, ys, dayElem, applyTrueSolar, dw, name, shiLabel};
     qnaHistory = [];
+    readingQnaHistory = []; lastReadingAiText = null;
     renderPillarsRow();
     renderRelPanel();
   }
@@ -2585,9 +2610,18 @@
   // ---------- 모달(오버레이) 팝업 ----------
   const modalOverlay=document.getElementById('modalOverlay');
   const modalClose=document.getElementById('modalClose');
+  const modalMinimize=document.getElementById('modalMinimize');
   let detailReturnPanelId=null; // 운세/궁합 등 안에서 십신·지장간·십이운성·일간 설명을 열었을 때, 닫기를 누르면 돌아갈 원래 패널
   let detailReturnScrollTop=0; // 그 패널을 보던 스크롤 위치
+  let minimizedPanels=[]; // 최소화된 패널들: {panelId, label, scrollTop}
+  const PANEL_LABELS={
+    'panel-reading':'사주풀이','panel-compat':'궁합','panel-fortune':'운세',
+    'panel-wedding':'결혼택일','panel-moving':'이사택일','panel-prayer':'기도택일',
+    'panel-zodiac':'별자리','panel-qna':'실시간 Q&A','panel-daewoon':'대운','panel-sewoon':'세운'
+  };
   function openModal(tab){
+    const panelId='panel-'+tab;
+    if(minimizedPanels.some(m=>m.panelId===panelId)){ restoreMinimized(panelId); return; }
     detailReturnPanelId=null;
     document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
     document.querySelectorAll('.reading-panel').forEach(p=>p.classList.remove('show'));
@@ -2634,6 +2668,57 @@
       detailReturnScrollTop = scrollEl ? scrollEl.scrollTop : 0;
     }
   }
+  // ---- 최소화(작업줄) ----
+  function minimizeModal(){
+    const shown=document.querySelector('.reading-panel.show');
+    if(!shown){ closeModal(); return; }
+    const scrollEl=modalOverlay.querySelector('.modal-scroll');
+    const scrollTop = scrollEl ? scrollEl.scrollTop : 0;
+    if(!minimizedPanels.some(m=>m.panelId===shown.id)){
+      minimizedPanels.push({ panelId:shown.id, label: PANEL_LABELS[shown.id]||shown.id.replace('panel-',''), scrollTop });
+    }
+    detailReturnPanelId=null;
+    modalOverlay.classList.remove('open');
+    modalOverlay.classList.remove('fullscreen');
+    document.body.style.overflow='';
+    renderMinimizedTaskbar();
+  }
+  function restoreMinimized(panelId){
+    const idx=minimizedPanels.findIndex(m=>m.panelId===panelId);
+    if(idx===-1) return;
+    const item=minimizedPanels[idx];
+    minimizedPanels.splice(idx,1);
+    document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
+    document.querySelectorAll('.reading-panel').forEach(p=>p.classList.remove('show'));
+    const panel=document.getElementById(item.panelId);
+    if(panel) panel.classList.add('show');
+    const tabName=item.panelId.replace('panel-','');
+    const tabBtn=document.querySelector('.tab-btn[data-tab="'+tabName+'"]');
+    if(tabBtn) tabBtn.classList.add('active');
+    modalOverlay.classList.toggle('fullscreen', item.panelId==='panel-qna');
+    modalOverlay.classList.add('open');
+    document.body.style.overflow='hidden';
+    modalOverlay.querySelector('.modal-scroll').scrollTop=item.scrollTop;
+    renderMinimizedTaskbar();
+  }
+  function discardMinimized(panelId){
+    minimizedPanels = minimizedPanels.filter(m=>m.panelId!==panelId);
+    renderMinimizedTaskbar();
+  }
+  function renderMinimizedTaskbar(){
+    const bar=document.getElementById('minimizedTaskbar');
+    if(!bar) return;
+    if(minimizedPanels.length===0){ bar.classList.remove('show'); bar.innerHTML=''; return; }
+    bar.innerHTML = minimizedPanels.map(m=>`<div class="min-pill" data-panel="${m.panelId}"><span>${m.label}</span><span class="min-pill-x" data-discard="${m.panelId}" title="닫기">×</span></div>`).join('');
+    bar.classList.add('show');
+  }
+  modalMinimize.addEventListener('click', minimizeModal);
+  document.getElementById('minimizedTaskbar').addEventListener('click',(e)=>{
+    const xBtn=e.target.closest('.min-pill-x');
+    if(xBtn){ e.stopPropagation(); discardMinimized(xBtn.dataset.discard); return; }
+    const pill=e.target.closest('.min-pill');
+    if(pill) restoreMinimized(pill.dataset.panel);
+  });
   modalClose.addEventListener('click', closeOrGoBack);
   modalOverlay.addEventListener('click',(e)=>{ if(e.target===modalOverlay) closeOrGoBack(); });
   document.addEventListener('keydown',(e)=>{ if(e.key==='Escape' && modalOverlay.classList.contains('open')) closeOrGoBack(); });
@@ -3055,6 +3140,7 @@
     input.value='';
     autoGrow(input);
     renderReadingQnaHistory();
+    scrollToLastQna('readingQnaHistoryBox');
 
     try{
       const {dayStemIdx, s, isMale:im, counts, strength, ys, year, month, day} = state;
@@ -3062,9 +3148,9 @@
       const ctx = (document.getElementById('ctxShared').value||'').trim();
       const ctxBlock = ctx ? `\n\n[질문자가 알려준 현재 상황]\n${ctx}\n\n위 상황은 질문자가 직접 알려준 사실이니 이것만 참고하고, 확인되지 않은 과거사를 새로 지어내거나 마치 미리 알고 있었던 것처럼 단정하지 마.` : '';
       const past = readingQnaHistory.filter(it=>it!==item && it.a!=null).slice(-10).map((it,i)=>`Q${i+1}. ${it.q}\nA${i+1}. ${it.a}`).join('\n\n');
-      const histBlock = past ? `\n\n[지금까지 나눈 대화]\n${past}\n\n위 대화를 기억하고 이어서 답해줘. 질문에 "그럼", "그 사람", "아까 말한 것"처럼 앞 내용을 가리키는 말이 있으면 위 대화에서 찾아 이해하고, 이미 설명한 내용은 반복하지 말고 이어서 새로운 내용을 답해줘.` : '';
+      const histBlock = past ? `\n\n[지금까지 나눈 대화]\n${past}\n\n위 대화를 기억하고 이어서 답해줘. 질문에 "그럼", "그 시기", "그 사람", "아까 말한 것"처럼 앞 내용을 가리키는 말이 있으면 위 대화에서 찾아 이해하고, 이미 설명한 내용은 반복하지 말고 이어서 새로운 내용을 답해줘.` : '';
       const priorReadingBlock = lastReadingAiText ? `\n\n[방금 본 AI 심층 사주풀이 전문]\n${lastReadingAiText}\n\n위 풀이 내용을 참고해서, 질문이 그 풀이의 특정 부분을 가리키면 그 맥락을 이어서 답해줘.` : '';
-      const prompt = `다음은 한 사람의 사주 정보입니다.\n\n${summary}${ctxBlock}${priorReadingBlock}${histBlock}\n\n반드시 위 사주 정보(오행, 십신, 지장간, 십이운성, 형충회합, 격국, 용신, 대운 등)를 종합해서 아래 질문에 답변해줘. 두루뭉술하게 얼버무리지 말고, 명리학적으로 판단되는 결론을 첫 문장에서 직설적으로 먼저 제시한 뒤 구체적 근거를 이어서 설명해줘. 분량 제한 없이 충분히 깊이 있게 한국어로 답해줘. 문단을 나눠 읽기 편하게 쓰되, 소제목·번호 목록·마크다운 기호(** 등) 없이 일반 글로 작성해줘.\n\n질문: ${q}`;
+      const prompt = `다음은 한 사람의 사주 정보입니다.\n\n${summary}${ctxBlock}${priorReadingBlock}${histBlock}\n\n반드시 위 [오늘 날짜]를 기준으로 '올해', '내년', '다음 달', '이번 달' 같은 시점을 해석하고, 이미 지나간 연도나 달을 앞으로 일어날 일처럼 말하지 마. 이 사주 정보(오행, 십신, 지장간, 십이운성, 형충회합, 격국, 용신, 대운 등)를 종합해서 아래 질문에 답변해줘. 두루뭉술하게 얼버무리지 말고, 명리학적으로 판단되는 결론을 첫 문장에서 직설적으로 먼저 제시한 뒤 구체적 근거를 이어서 설명해줘. 분량 제한 없이 충분히 깊이 있게 한국어로 답해줘. 문단을 나눠 읽기 편하게 쓰되, 소제목·번호 목록·마크다운 기호(** 등) 없이 일반 글로 작성해줘.\n\n질문: ${q}`;
       const answer = await callClaude(prompt);
       item.a = answer||'답변을 받지 못했습니다.';
     } catch(e){
@@ -3076,6 +3162,7 @@
       const b=document.getElementById('readingQnaBtn');
       if(b){ b.disabled=false; b.textContent='질문하기'; }
       renderReadingQnaHistory();
+      scrollToLastQna('readingQnaHistoryBox');
     }
   }
 
@@ -3827,8 +3914,8 @@
       </div>`;
     }).join('');
   }
-  function scrollToLastQna(){
-    const items=document.querySelectorAll('#qnaHistoryBox .qna-item');
+  function scrollToLastQna(boxId){
+    const items=document.querySelectorAll('#'+(boxId||'qnaHistoryBox')+' .qna-item');
     const last=items[items.length-1];
     if(last) last.scrollIntoView({behavior:'smooth', block:'start'});
   }
