@@ -2357,9 +2357,9 @@
         return '음성 인식 중 오류가 발생했습니다 (' + err + ').';
     }
   }
+  const voiceStopFns={};
   function stopMicIfRecording(btnId){
-    const btn=document.getElementById(btnId);
-    if(btn && btn.classList.contains('recording')) btn.click();
+    if(voiceStopFns[btnId]) voiceStopFns[btnId]();
   }
   function attachVoiceInput(textareaId, btnId, errId){
     const ta=document.getElementById(textareaId), btn=document.getElementById(btnId);
@@ -2434,10 +2434,18 @@
       ta.value = baseText + interim;
       autoGrow(ta);
     };
+    // 즉시(동기적으로) 멈춘 것처럼 화면을 바꾸고, 인식 엔진에는 stop()과 abort()를 둘 다 걸어서
+    // "문장이 막 끝나 onend가 재시작을 막 걸어놓은" 타이밍에 눌러도 확실히 꺼지게 한다.
+    const stopListening=()=>{
+      if(!wantListening) return;
+      wantListening=false;
+      finalizeUI();
+      try{ recog.stop(); }catch(e){}
+      try{ recog.abort(); }catch(e){}
+    };
     btn.addEventListener('click',()=>{
       if(wantListening){
-        wantListening=false;
-        recog.stop();
+        stopListening();
       } else {
         showErr('');
         if(!navigator.mediaDevices && location.protocol==='file:'){
@@ -2457,6 +2465,7 @@
         });
       }
     });
+    voiceStopFns[btnId]=stopListening;
   }
   attachVoiceInput('ctxShared','micCtxShared','micErrCtxShared');
   (function(){
