@@ -825,6 +825,14 @@
     const ratio = support/total;
     return { ratio, strength: ratio>=0.5 ? '신강' : '신약' };
   }
+  // 신강/신약을 넘어 극신강·신강·중화·신약·극신약 5단계로 세분화한 표시용 등급 (용신 판정 자체는 여전히 신강/신약 이분법을 그대로 씀)
+  function strengthTier(ratio){
+    if(ratio>=0.75) return '극신강';
+    if(ratio>=0.55) return '신강';
+    if(ratio>=0.45) return '중화';
+    if(ratio>=0.25) return '신약';
+    return '극신약';
+  }
 
   function computeYongsin(dayElem, strength){
     let yong,hui,gi,gu;
@@ -1545,9 +1553,11 @@
     if(detectWoldeok(s)) named.push('월덕귀인');
     if(detectCheonuiseong(s)) named.push('천의성');
     if(detectCheonmunseong(s)) named.push('천문성');
-    const gyeok=determineGyeokguk(s, dayStemIdx, assessStrength(s, dayStemIdx).ratio, state.counts, state.dayElem);
+    const strengthRatio = assessStrength(s, dayStemIdx).ratio;
+    const gyeok=determineGyeokguk(s, dayStemIdx, strengthRatio, state.counts, state.dayElem);
     const gmLabel=gongmang.map(b=>BRANCH_HANJA[b]).join('·');
-    let noteHtml = `<span>공망(空亡): ${gmLabel}</span> <span style="margin-left:10px;">· <b>${state.strength}</b> 사주</span>`;
+    const jungwhaNote = strengthTier(strengthRatio)!==state.strength ? ` (세부: ${strengthTier(strengthRatio)})` : '';
+    let noteHtml = `<span>공망(空亡): ${gmLabel}</span> <span style="margin-left:10px;">· <b>${state.strength}</b> 사주${jungwhaNote}</span>`;
     if(gyeok.warning==='외격'){
       const label = gyeok.oegyeokName ? `외격(外格) — ${gyeok.oegyeokName} 후보` : '외격(外格) 가능성';
       noteHtml += ` <span style="margin-left:10px;color:var(--seal);">· ${label} — ${gyeok.note}</span>`;
@@ -1883,7 +1893,11 @@
       `성별: ${isMaleFlag?'남자':'여자'}`,
       `년주: ${p(s.year)}`, `월주: ${p(s.month)}`, `일주: ${p(s.day)} [일간]`, `시주: ${s.hour?p(s.hour):'시간 미상'}`,
       `오행 분포: 목${counts.목} 화${counts.화} 토${counts.토} 금${counts.금} 수${counts.수}`,
-      `신강/신약: ${strength}`,
+      `신강/신약: ${strength}${(()=>{ const r=assessStrength(s, dayStemIdx).ratio, t=strengthTier(r);
+        if(t==='극신강') return ' (세부 등급: 극신강 — 힘을 덜어주는 식상·재성·관성의 역할이 특히 중요)';
+        if(t==='극신약') return ' (세부 등급: 극신약 — 힘을 보태주는 인성·비겁의 역할이 특히 중요)';
+        if(t==='중화') return ' (세부 등급: 중화 — 신강·신약 세력이 팽팽하니 용신 판단 시 조후·격국을 더 비중 있게 함께 고려해줘)';
+        return ` (세부 등급: ${t})`; })()}`,
       `용신: ${ys.yong} / 희신: ${ys.hui} / 기신: ${ys.gi} / 구신: ${ys.gu}`
     ];
 
@@ -3086,6 +3100,12 @@
     const strengthDesc = strength==='신강'
       ? '일간의 힘이 비교적 강한 편입니다. 스스로 밀고 나가는 힘이 있고 주체성이 뚜렷하지만, 고집이나 독선으로 흐르지 않도록 주변과의 조화에 신경 쓰면 좋습니다.'
       : '일간의 힘이 비교적 약한 편입니다. 주변 상황과 사람들의 영향을 많이 받는 편이라, 자신을 도와주는 오행(인성·비겁)을 보완하면 안정감을 얻는 데 도움이 됩니다.';
+    const strengthRatioForDisplay = assessStrength(s, dayStemIdx).ratio;
+    const strengthTierForDisplay = strengthTier(strengthRatioForDisplay);
+    const jungwhaDesc = strengthTierForDisplay==='극신강' ? ' 그중에서도 일간의 힘이 매우 강한 극신강에 가까운 사주로, 힘을 덜어주는 오행(식상·재성·관성)의 도움이 더욱 중요합니다.'
+      : strengthTierForDisplay==='극신약' ? ' 그중에서도 일간의 힘이 매우 약한 극신약에 가까운 사주로, 자신을 도와주는 오행(인성·비겁)의 도움이 더욱 절실합니다.'
+      : strengthTierForDisplay==='중화' ? ' 다만 신강과 신약의 세력이 팽팽하게 맞서 있어 중화(中和)에 가까운 사주이며, 이런 경우 용신은 억부보다 조후나 격국을 함께 살펴 신중하게 정하는 것이 좋습니다.'
+      : '';
     let maxE=ELEM_ORDER[0], minE=ELEM_ORDER[0];
     ELEM_ORDER.forEach(e=>{ if(counts[e]>counts[maxE]) maxE=e; if(counts[e]<counts[minE]) minE=e; });
     const groups={비겁:0, 식상:0, 재성:0, 관성:0, 인성:0};
@@ -3134,7 +3154,7 @@
     document.getElementById('panel-reading').innerHTML = `
       <h4>사주풀이</h4>
       <p><b>일간(나)</b>은 ${STEM_HANJA[dayStemIdx]}(${STEMS[dayStemIdx]}) · <b>${dayElem}(${dayYY})</b> 기운입니다. ${ELEM_DESC[dayElem]}이 이 사주의 기본 성향입니다.</p>
-      <h5>신강 · 신약</h5><p><b>${strength}(身${strength==='신강'?'強':'弱'})</b> 경향으로 분석됩니다. ${strengthDesc}</p>
+      <h5>신강 · 신약</h5><p><b>${strengthTierForDisplay}</b> 경향으로 분석됩니다. ${strengthDesc}${jungwhaDesc}</p>
       <h5>오행 분포</h5><p>여덟 글자 중 <b>${maxE}</b> 기운이 가장 두드러지고, <b>${minE}</b> 기운은 상대적으로 약합니다. 용신(${ys.yong})과 희신(${ys.hui}) 기운을 보완하면 균형에 도움이 됩니다.</p>
       <h5 style="font-size:13px;margin:14px 0 6px;color:var(--ink-soft);">성격과 기질 (십신 전체 분석)</h5>
       <p>여덟 글자 중 <b>${maxGroup}</b> 기운의 십신이 가장 많이 나타납니다. ${GROUP_DESC[maxGroup]}</p>
