@@ -140,8 +140,6 @@
   .rel-item{padding:8px 10px; background:#fffdf7; border:1px solid var(--rule); border-radius:8px; font-size:12.5px; margin-bottom:6px;}
   .rel-item b{color:var(--seal);}
   .yongsin-box{margin:10px 0; font-size:13px; line-height:1.8;}
-  .ys-item{background:#fffdf7; border:1px solid var(--rule); border-radius:8px; padding:8px 10px; font-size:12.5px;}
-  .ys-item b{display:block; font-size:11px; color:var(--ink-soft); margin-bottom:2px;}
   .ai-btn{width:100%; background:#2d2a4a; color:#fff; border-color:#2d2a4a; font-weight:700; padding:11px; cursor:pointer; margin-top:16px; letter-spacing:0.02em;}
   .ai-btn:hover{background:#1f1c38;}
   .ai-btn:disabled{opacity:0.6; cursor:default;}
@@ -184,7 +182,7 @@
   }
   .modal-overlay.open{ display:flex; }
   .modal-box{
-    background:var(--paper); border-radius:16px; max-width:1120px; width:100%;
+    background:var(--paper); border-radius:16px; width:90vw; max-width:1400px;
     position:relative; padding:54px 28px 26px; box-shadow:0 24px 64px rgba(0,0,0,0.35);
     animation:modalIn .22s ease both;
   }
@@ -366,12 +364,34 @@
 
   <div id="result">
     <div class="result-head"><h2 id="resultTitle">사주원국</h2><span id="resultMeta"></span></div>
-    <div style="display:flex; justify-content:flex-end; gap:8px; margin-bottom:8px; flex-wrap:wrap;">
-      <button type="button" id="btnToggleDw" class="go-btn" style="width:auto; padding:7px 14px; font-size:12px; background:#fffdf7; color:var(--ink); border-color:var(--rule);">대운보기</button>
-      <button type="button" id="btnToggleSw" class="go-btn" style="width:auto; padding:7px 14px; font-size:12px; background:#fffdf7; color:var(--ink); border-color:var(--rule);">세운보기</button>
-      <button type="button" id="btnShowInputCard" class="go-btn" style="width:auto; padding:7px 14px; font-size:12px; background:#fffdf7; color:var(--ink); border-color:var(--rule); display:none;">✎ 정보 다시 입력</button>
-      <button type="button" id="btnEditToggle" class="go-btn" style="width:auto; padding:7px 14px; font-size:12px; background:#fffdf7; color:var(--ink); border-color:var(--rule); display:inline-block;">✎ 사주원국 수동 수정</button>
+    <div style="display:flex; justify-content:flex-end; gap:6px; margin-bottom:8px; flex-wrap:wrap;">
+      <div style="display:flex; border:1px solid var(--rule); border-radius:8px; overflow:hidden;">
+        <button type="button" id="btnToggleRel" style="padding:6px 8px; font-size:11px; background:#fffdf7; color:var(--ink); border:none; cursor:pointer; white-space:nowrap;">형충회합보기</button>
+      </div>
+      <div style="display:flex; border:1px solid var(--rule); border-radius:8px; overflow:hidden;">
+        <button type="button" id="btnDwPillar" style="padding:6px 8px; font-size:11px; background:#fffdf7; color:var(--ink); border:none; border-right:1px solid var(--rule); cursor:pointer; white-space:nowrap;">대운기둥</button>
+        <button type="button" id="btnDwList" style="padding:6px 8px; font-size:11px; background:#fffdf7; color:var(--ink); border:none; cursor:pointer; white-space:nowrap;">대운목록</button>
+      </div>
+      <div style="display:flex; border:1px solid var(--rule); border-radius:8px; overflow:hidden;">
+        <button type="button" id="btnSwPillar" style="padding:6px 8px; font-size:11px; background:#fffdf7; color:var(--ink); border:none; border-right:1px solid var(--rule); cursor:pointer; white-space:nowrap;">세운기둥</button>
+        <button type="button" id="btnSwList" style="padding:6px 8px; font-size:11px; background:#fffdf7; color:var(--ink); border:none; cursor:pointer; white-space:nowrap;">세운목록</button>
+      </div>
+      <button type="button" id="btnShowInputCard" class="go-btn" style="width:auto; padding:6px 8px; font-size:11px; background:#fffdf7; color:var(--ink); border-color:var(--rule); display:none; white-space:nowrap;">✎다시입력</button>
+      <button type="button" id="btnEditToggle" class="go-btn" style="width:auto; padding:6px 8px; font-size:11px; background:#fffdf7; color:var(--ink); border-color:var(--rule); display:inline-block; white-space:nowrap;">✎수동수정</button>
     </div>
+
+    <div id="relList" style="display:none;"></div>
+
+    <div id="dwBody" style="display:none;">
+      <div class="dw-meta" id="dwMeta"></div>
+      <div id="dwList"></div>
+      <div class="dw-legend">길흉: <span class="gy-good">●용신/희신운</span> · <span class="gy-mid">●평운</span> · <span class="gy-bad">●기신/구신운</span></div>
+    </div>
+
+    <div id="swBody" style="display:none;">
+      <div id="swList"></div>
+    </div>
+
     <div id="pillarsWrap" style="position:relative;">
       <svg id="relSvgTop" style="display:block;width:100%;pointer-events:none;" height="1"></svg>
       <div class="pillars" id="pillars"></div>
@@ -394,35 +414,11 @@
     </div>
     <p class="note keep-size" id="introNote" style="margin-top:14px; margin-bottom:22px; font-size:10pt;">위 버튼을 누르면 팝업창으로 해당 풀이를 볼 수 있어요.</p>
 
-    <div class="balance"><h3>오행 분포</h3><div class="bar" id="bar"></div><div class="legend" id="legend"></div></div>
-
-    <div style="display:flex; gap:12px; align-items:flex-start; flex-wrap:nowrap;">
-      <div class="panel" id="relPanel" style="flex:1; min-width:0;">
-        <div style="display:flex; align-items:center; justify-content:space-between; gap:8px; flex-wrap:wrap;">
-          <h3 style="margin:0;">형충회합 (刑沖會合)</h3>
-          <button type="button" id="relPanelToggle" class="go-btn" style="width:auto; padding:5px 10px; font-size:11px; background:#fffdf7; color:var(--ink); border-color:var(--rule);">형충회합 보기</button>
-        </div>
-        <div id="relList" style="display:none; margin-top:10px;"></div>
-      </div>
-
-      <div class="panel" id="ysPanel" style="flex:1; min-width:0;">
-        <h3>용신 (用神)</h3>
-        <div class="yongsin-box" id="ysBox"></div>
-      </div>
-    </div>
-
-    <div style="display:flex; gap:12px; align-items:flex-start; flex-wrap:nowrap;">
-      <div class="panel" id="dwPanel" style="flex:1; min-width:0;">
-        <h3>대운 (大運)</h3>
-        <div class="dw-meta" id="dwMeta"></div>
-        <div id="dwList"></div>
-        <div class="dw-legend">길흉: <span class="gy-good">●용신/희신운</span> · <span class="gy-mid">●평운</span> · <span class="gy-bad">●기신/구신운</span></div>
-      </div>
-
-      <div class="panel" id="swPanel" style="flex:1; min-width:0;">
-        <h3>세운 (歲運) · 최근 10년</h3>
-        <div id="swList"></div>
-      </div>
+    <div class="balance">
+      <h3>오행 분포</h3>
+      <div class="bar" id="bar"></div>
+      <div class="legend" id="legend"></div>
+      <div class="yongsin-box" id="ysBox" style="margin-top:10px;padding-top:10px;border-top:1px dashed var(--rule);"></div>
     </div>
 
     <div class="panel" id="aiKeyPanel">
@@ -2213,17 +2209,6 @@
     });
   })();
 
-  // ---- 형충회합 패널 접기/펼치기 ----
-  (function(){
-    const toggle=document.getElementById('relPanelToggle'), body=document.getElementById('relList');
-    if(!toggle||!body) return;
-    toggle.addEventListener('click',()=>{
-      const open = body.style.display==='none';
-      body.style.display = open ? 'block' : 'none';
-      toggle.textContent = open ? '형충회합 접기' : '형충회합 보기';
-    });
-  })();
-
   // ---- API 키 목록 UI ----
   const geminiKeyInput=document.getElementById('geminiKey');
   const keySaveBtn=document.getElementById('keySaveBtn');
@@ -2606,30 +2591,50 @@
   document.getElementById('btnShowInputCard').addEventListener('click', showInputCard);
   // "대운보기"/"세운보기": 지금 나이 기준 대운·올해 세운을, 대운/세운 표에서 그 행을 클릭한 것과 똑같이
   // 선택 상태로 만들어서 원국 옆에 기둥으로 나란히 보여준다(스크롤 없이 버튼 한 번으로).
-  document.getElementById('btnToggleDw').addEventListener('click', function(){
+  document.getElementById('btnDwPillar').addEventListener('click', function(){
     if(!state || !state.dw) return;
     const btn=this;
     if(selectedDwIdx!=null){
-      selectedDwIdx=null; btn.textContent='대운보기';
+      selectedDwIdx=null; btn.textContent='대운기둥';
     } else {
       const nowYear=new Date().getFullYear(), age=nowYear-state.year+1;
       const idx=state.dw.list.findIndex(it=>age>=it.ageFrom && age<=it.ageTo);
       if(idx===-1) return;
-      selectedDwIdx=idx; btn.textContent='대운접기';
+      selectedDwIdx=idx; btn.textContent='기둥접기';
     }
     renderPillarsRow();
-    document.getElementById('pillarsWrap').scrollIntoView({behavior:'smooth', block:'start'});
+    renderRelPanel();
+    updateDwSwActiveStyles();
   });
-  document.getElementById('btnToggleSw').addEventListener('click', function(){
+  document.getElementById('btnDwList').addEventListener('click', function(){
+    const btn=this, body=document.getElementById('dwBody');
+    const open = body.style.display==='none';
+    body.style.display = open ? 'block' : 'none';
+    btn.textContent = open ? '목록접기' : '대운목록';
+  });
+  document.getElementById('btnSwPillar').addEventListener('click', function(){
     if(!state) return;
     const btn=this;
     if(selectedSwYear!=null){
-      selectedSwYear=null; btn.textContent='세운보기';
+      selectedSwYear=null; btn.textContent='세운기둥';
     } else {
-      selectedSwYear=new Date().getFullYear(); btn.textContent='세운접기';
+      selectedSwYear=new Date().getFullYear(); btn.textContent='기둥접기';
     }
     renderPillarsRow();
-    document.getElementById('pillarsWrap').scrollIntoView({behavior:'smooth', block:'start'});
+    renderRelPanel();
+    updateDwSwActiveStyles();
+  });
+  document.getElementById('btnSwList').addEventListener('click', function(){
+    const btn=this, body=document.getElementById('swBody');
+    const open = body.style.display==='none';
+    body.style.display = open ? 'block' : 'none';
+    btn.textContent = open ? '목록접기' : '세운목록';
+  });
+  document.getElementById('btnToggleRel').addEventListener('click', function(){
+    const btn=this, body=document.getElementById('relList');
+    const open = body.style.display==='none';
+    body.style.display = open ? 'block' : 'none';
+    btn.textContent = open ? '형충회합접기' : '형충회합보기';
   });
 
   // ---- 계산 결과 렌더링 (최초 계산 및 수동 수정 적용 시 공용으로 사용) ----
@@ -2637,9 +2642,15 @@
     const {year, month, day, hour, minute, hasTime, isMale:im, convertedNote, applyTrueSolar, longitude, edited, name, shiLabel} = meta;
     const dayStemIdx=s.day.stem;
     selectedDwIdx=null; selectedSwYear=null;
-    const btnDw=document.getElementById('btnToggleDw'), btnSw=document.getElementById('btnToggleSw');
-    if(btnDw) btnDw.textContent='대운보기';
-    if(btnSw) btnSw.textContent='세운보기';
+    const btnDwP=document.getElementById('btnDwPillar'), btnSwP=document.getElementById('btnSwPillar');
+    if(btnDwP) btnDwP.textContent='대운기둥';
+    if(btnSwP) btnSwP.textContent='세운기둥';
+    const btnDwL=document.getElementById('btnDwList'), btnSwL=document.getElementById('btnSwList');
+    if(btnDwL) btnDwL.textContent='대운목록';
+    if(btnSwL) btnSwL.textContent='세운목록';
+    const dwBody=document.getElementById('dwBody'), swBody=document.getElementById('swBody');
+    if(dwBody) dwBody.style.display='none';
+    if(swBody) swBody.style.display='none';
 
     const counts={목:0,화:0,토:0,금:0,수:0};
     counts[STEM_ELEM[s.year.stem]]++; counts[BRANCH_ELEM[s.year.branch]]++;
@@ -2663,7 +2674,7 @@
     const strength = strengthResult.strength;
     const ys = computeYongsin(dayElem, strength);
     document.getElementById('ysBox').innerHTML =
-      `<span class="ys-item"><b>용신</b> ${ys.yong}</span> · <span class="ys-item"><b>희신</b> ${ys.hui}</span> · <span class="ys-item"><b>기신</b> ${ys.gi}</span> · <span class="ys-item"><b>구신</b> ${ys.gu}</span>`;
+      `<b>용신</b>: ${ys.yong} &nbsp;&nbsp; <b>희신</b>: ${ys.hui} &nbsp;&nbsp; <b>기신</b>: ${ys.gi} &nbsp;&nbsp; <b>구신</b>: ${ys.gu}`;
 
     // 대운
     const dw=computeDaewoon(s, im, year, month, day);
