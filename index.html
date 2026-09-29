@@ -3246,9 +3246,15 @@ window.__pip = (function(){
   // 탭을 눌렀을 때 호출: 별도 창으로 열었으면 true, 열 수 없으면(좁은 화면·팝업 차단) false → 기존 메인 팝업으로 연다.
   // window.open 은 클릭 직후에 동기로 불러야 브라우저가 허용하므로 이 함수 안에 await 를 두지 않는다.
   let popBlockedWarned=false;
-  function popTab(tab){
+  function popTab(tab, renderFn){
     const panelId='panel-'+tab;
     if(!PIP_PANELS.includes(panelId) || window.innerWidth<=800) return false;
+    // 이미 별도 창에 그 패널이 열려 있으면: 내용만 그 창 안에서 다시 그리고 창을 앞으로 (메인에는 빈 팝업을 띄우지 않는다)
+    if(pipHolds(panelId)){
+      if(renderFn){ detailReturnPanelId=null; renderFn(); if(pipScroll) pipScroll.scrollTop=0; }
+      focusPip();
+      return true;
+    }
     const panel=document.getElementById(panelId);
     if(!panel) return false;
     if(pipWin && pipWin.closed) pipOnClosed(false);
@@ -3274,7 +3280,7 @@ window.__pip = (function(){
     detailReturnPanelId=null;
     document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
     const tb=document.querySelector('.tab-btn[data-tab="'+tab+'"]'); if(tb) tb.classList.add('active');
-    renderTab(tab);
+    if(renderFn) renderFn(); else renderTab(tab);
     panel.classList.add('show');
     pipHolder=document.createComment('pip-holder');
     panel.parentNode.insertBefore(pipHolder, panel);
@@ -3423,6 +3429,7 @@ window.__pip = (function(){
     openDaewoonDetail(idx);
   });
   function openDaewoonDetail(idx){
+    if(popTab('daewoon', ()=>renderDaewoonDetail(idx))) return; // 별도 창으로 연다 (좁은 화면·팝업 차단이면 아래 메인 팝업)
     document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
     document.querySelectorAll('.reading-panel').forEach(p=>p.classList.remove('show'));
     const panel=document.getElementById('panel-daewoon');
@@ -3505,6 +3512,7 @@ window.__pip = (function(){
     openSewoonDetail(idx);
   });
   function openSewoonDetail(idx){
+    if(popTab('sewoon', ()=>renderSewoonDetail(idx))) return; // 별도 창으로 연다 (좁은 화면·팝업 차단이면 아래 메인 팝업)
     document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
     document.querySelectorAll('.reading-panel').forEach(p=>p.classList.remove('show'));
     const panel=document.getElementById('panel-sewoon');
