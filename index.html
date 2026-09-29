@@ -284,18 +284,21 @@
   .share-msg{ font-size:11px; color:var(--ink-soft); }
   .print-sheet{ display:none; }
   @media print{
-    @page{ size:A4 portrait; margin:18mm 16mm; }
-    html, body{ background:#fff !important; }
+    @page{ size:A4 portrait; margin:0; } /* 용지 여백을 0으로 두면 브라우저가 붙이는 날짜·제목·주소 머리글/바닥글이 나오지 않는다 */
+    html, body{ margin:0 !important; padding:0 !important; background:#fff !important; }
     body > *:not(.print-sheet){ display:none !important; }
-    .print-sheet{ display:block !important; color:#000; font-family:'Noto Serif KR','Nanum Myeongjo','Batang','Times New Roman',serif; }
-    .print-sheet .ps-title{ font-size:17pt; margin:0 0 4pt; }
-    .print-sheet .ps-sub{ font-size:12pt; font-weight:700; margin-bottom:4pt; }
-    .print-sheet .ps-meta{ font-size:10pt; color:#333; line-height:1.6; }
-    .print-sheet hr{ border:0; border-top:1px solid #999; margin:10pt 0 12pt; }
-    .print-sheet .ps-body{ font-size:11.5pt; line-height:1.85; white-space:pre-wrap; word-break:keep-all; overflow-wrap:break-word; orphans:3; widows:3; }
-    .print-sheet .ps-q{ font-size:11.5pt; font-weight:700; margin-bottom:5pt; }
+    .print-sheet{ display:block !important; padding:0 16mm; color:#000; font-family:'Noto Serif KR','Nanum Myeongjo','Batang','Times New Roman',serif; }
+    .print-sheet table{ width:100%; border-collapse:collapse; }
+    .print-sheet td{ padding:0; vertical-align:top; }
+    .print-sheet .ps-spacer{ height:16mm; }
+    .print-sheet .ps-title{ font-size:22pt; font-weight:800; margin:0 0 6pt; }
+    .print-sheet .ps-sub{ font-size:15pt; font-weight:700; margin-bottom:6pt; }
+    .print-sheet .ps-meta{ font-size:12pt; color:#222; line-height:1.6; }
+    .print-sheet hr{ border:0; border-top:1px solid #777; margin:12pt 0 14pt; }
+    .print-sheet .ps-body{ font-size:14pt; line-height:1.85; white-space:pre-wrap; word-break:keep-all; overflow-wrap:break-word; orphans:3; widows:3; }
+    .print-sheet .ps-q{ font-size:14pt; font-weight:700; margin-bottom:6pt; }
     .print-sheet .ps-qa{ break-inside:auto; }
-    .print-sheet .ps-foot{ margin-top:16pt; padding-top:6pt; border-top:1px solid #bbb; font-size:9pt; color:#555; }
+    .print-sheet .ps-foot{ margin-top:18pt; padding-top:8pt; border-top:1px solid #aaa; font-size:10.5pt; color:#444; }
   }
 </style>
 
@@ -2050,13 +2053,20 @@ window.__pip = (function(){
     const doc=btn.ownerDocument, win=doc.defaultView||window;
     const panel=btn.closest('.reading-panel');
     const pid=panel ? panel.id : '';
-    let label=(typeof PANEL_LABELS!=='undefined' && PANEL_LABELS[pid]) || '사주 풀이';
+    let label=(typeof PANEL_LABELS!=='undefined' && PANEL_LABELS[pid]) || '사주풀이';
     const heading=panel ? panel.querySelector('h4') : null;
     const sub = (!item && heading && (pid==='panel-daewoon'||pid==='panel-sewoon')) ? heading.textContent.trim() : '';
-    if(item) label += ' Q&A'; 
+    if(item) label += ' Q&A';
+    // 표 모양으로 만들어 두면 페이지마다 위·아래 여백이 반복되므로, 브라우저가 붙이는 날짜·주소 같은 머리글/바닥글이 나오는 용지 여백을 0으로 둘 수 있다
     const sheet=doc.createElement('div'); sheet.className='print-sheet';
-    const add=(tag,cls,text)=>{ const el=doc.createElement(tag); if(cls) el.className=cls; el.textContent=text; sheet.appendChild(el); return el; };
-    add('h1','ps-title','사주 풀이 · '+label);
+    const table=doc.createElement('table'); sheet.appendChild(table);
+    const mkRow=(tag)=>{ const g=doc.createElement(tag), tr=doc.createElement('tr'), td=doc.createElement('td'); g.appendChild(tr); tr.appendChild(td); return {g,td}; };
+    const head=mkRow('thead'), foot=mkRow('tfoot'), body=mkRow('tbody');
+    [head.td, foot.td].forEach(td=>{ const sp=doc.createElement('div'); sp.className='ps-spacer'; td.appendChild(sp); });
+    table.appendChild(head.g); table.appendChild(foot.g); table.appendChild(body.g);
+    const cell=body.td;
+    const add=(tag,cls,text)=>{ const el=doc.createElement(tag); if(cls) el.className=cls; el.textContent=text; cell.appendChild(el); return el; };
+    add('h1','ps-title',label);
     if(sub) add('div','ps-sub',sub);
     if(state){
       const intro=(document.getElementById('introNote')||{}).textContent||'';
@@ -2066,10 +2076,10 @@ window.__pip = (function(){
       add('div','ps-meta','년주 '+P(state.s.year)+'   월주 '+P(state.s.month)+'   일주 '+P(state.s.day)+'   시주 '+(state.s.hour?P(state.s.hour):'시간 미상'));
     }
     add('div','ps-meta','인쇄일 '+new Date().toLocaleDateString('ko-KR',{year:'numeric',month:'long',day:'numeric'}));
-    sheet.appendChild(doc.createElement('hr'));
+    cell.appendChild(doc.createElement('hr'));
     if(item){
       const q=item.firstElementChild, ans=item.querySelector('.ai-box');
-      const wrap=doc.createElement('div'); wrap.className='ps-qa'; sheet.appendChild(wrap);
+      const wrap=doc.createElement('div'); wrap.className='ps-qa'; cell.appendChild(wrap);
       const qe=doc.createElement('div'); qe.className='ps-q'; qe.textContent=q?q.textContent.trim():''; wrap.appendChild(qe);
       const ae=doc.createElement('div'); ae.className='ps-body'; ae.textContent=ans?ans.textContent.trim():''; wrap.appendChild(ae);
     } else {
