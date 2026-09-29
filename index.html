@@ -3038,7 +3038,7 @@ window.__pip = (function(){
   let detailReturnPanelId=null; // 운세/궁합 등 안에서 십신·지장간·십이운성·일간 설명을 열었을 때, 닫기를 누르면 돌아갈 원래 패널
   let detailReturnScrollTop=0; // 그 패널을 보던 스크롤 위치
   let minimizedPanels=[]; // 최소화된 패널들: {panelId, label, scrollTop}
-  let pipWin=null, pipPanelId=null, pipPanelEl=null, pipHolder=null, pipScroll=null, pipTitleEl=null, pipKind=null, pipOpening=false; // 별도 창(PiP) 상태
+  let pipWin=null, pipPanelId=null, pipPanelEl=null, pipHolder=null, pipScroll=null, pipTitleEl=null, pipKind=null, pipReopen=false, pipOpening=false; // 별도 창(PiP) 상태
   const PANEL_LABELS={
     'panel-reading':'사주풀이','panel-compat':'궁합','panel-fortune':'운세',
     'panel-wedding':'결혼택일','panel-moving':'이사택일','panel-prayer':'기도택일',
@@ -3226,7 +3226,11 @@ window.__pip = (function(){
     }
     const retBtn=d.createElement('button'); retBtn.type='button'; retBtn.className='pip-max';
     retBtn.textContent='메인으로'; retBtn.title='이 창을 닫고 패널을 메인 화면 팝업으로 되돌리기';
-    retBtn.addEventListener('click', ()=>{ try{ win.close(); }catch(e){} });
+    retBtn.addEventListener('click', ()=>{
+      pipReopen=true; // 이 버튼으로 닫을 때만 메인 팝업에 패널을 다시 띄운다
+      try{ win.close(); }catch(e){ pipReopen=false; }
+      setTimeout(()=>{ if(!win.closed) pipReopen=false; }, 1000);
+    });
     bar.appendChild(retBtn);
     pipScroll=d.createElement('div'); pipScroll.className='modal-scroll';
     box.appendChild(bar); box.appendChild(pipScroll); d.body.appendChild(box);
@@ -3240,7 +3244,11 @@ window.__pip = (function(){
     });
     // 창이 닫히면(× 버튼·메인으로 버튼 등) 패널을 메인으로 되돌린다. pagehide가 안 오는 경우를 대비해 closed 여부도 주기적으로 확인
     let timer=null;
-    const onGone=()=>{ if(timer){ clearInterval(timer); timer=null; } if(pipWin===win) pipOnClosed(); };
+    const onGone=()=>{
+      if(timer){ clearInterval(timer); timer=null; }
+      const re=pipReopen; pipReopen=false;
+      if(pipWin===win) pipOnClosed(re);
+    };
     win.addEventListener('pagehide', onGone);
     timer=setInterval(()=>{ if(win.closed) onGone(); }, 600);
   }
@@ -3255,14 +3263,15 @@ window.__pip = (function(){
     return id;
   }
   function pipClearRefs(){
-    pipWin=null; pipKind=null; pipScroll=null; pipTitleEl=null;
+    pipWin=null; pipKind=null; pipScroll=null; pipTitleEl=null; pipReopen=false;
     window.__pip.win=null; window.__pip.doc=null;
   }
-  // 별도 창이 닫혔을 때: 패널을 메인으로 되돌리고, 메인 팝업이 비어 있으면 그 패널을 다시 띄운다
-  function pipOnClosed(){
+  // 별도 창이 닫혔을 때: 패널을 메인으로 되돌려 숨겨 둔다.
+  // reopen=true(상단 바의 '메인으로' 버튼)일 때만, 메인 팝업이 비어 있으면 그 패널을 다시 띄운다. ×로 닫으면 창만 닫힌다.
+  function pipOnClosed(reopen){
     const id=pipDockBack();
     pipClearRefs();
-    if(!id || modalOverlay.classList.contains('open')) return;
+    if(!id || !reopen || modalOverlay.classList.contains('open')) return;
     const tab=id.replace('panel-','');
     document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
     document.querySelectorAll('.reading-panel').forEach(p=>p.classList.remove('show'));
