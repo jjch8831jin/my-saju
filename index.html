@@ -277,6 +277,11 @@
   #swYearBox > button{ flex:0 0 auto; }
   #swYearBox{ flex:1 0 auto; }
   #swYearBox > input{ flex:1 1 62px; min-width:62px; width:auto !important; box-sizing:border-box; padding-left:0 !important; padding-right:0 !important; text-align:center; }
+  .ai-stop{ margin-left:10px; padding:2px 10px; font-size:11px; border:1px solid var(--rule); border-radius:8px; background:#fffdf7; color:var(--seal); cursor:pointer; }
+  .share-bar{ display:none; align-items:center; gap:8px; margin-top:6px; }
+  .share-btn{ padding:3px 12px; font-size:11px; border:1px solid var(--rule); border-radius:8px; background:#fffdf7; color:var(--ink); cursor:pointer; }
+  .share-btn:hover{ background:#2d2a4a; color:#fff; border-color:#2d2a4a; }
+  .share-msg{ font-size:11px; color:var(--ink-soft); }
 </style>
 
 </head>
@@ -323,6 +328,7 @@
     </div>
     <label class="unknown-time keep-size"><input type="checkbox" id="chkUnknown"> 태어난 시간을 모릅니다 (시주·십이운성 일부 제외)</label>
     <label class="unknown-time keep-size"><input type="checkbox" id="chkTrueSolar" checked> 진태양시 보정 적용 (출생지 경도·시대별 표준시·서머타임까지 반영 · 대부분의 만세력 사이트 기본값)</label>
+    <label class="unknown-time keep-size"><input type="checkbox" id="chkYajasi"> 자시(23시대) 출생은 당일 일주로 보기 (야자시 적용 · 끄면 23시부터 다음날로 봅니다)</label>
     <div class="field" style="max-width:260px;">
       <label class="keep-size" style="font-size:12pt;">출생지(경도 보정)</label>
       <select id="selLocation">
@@ -895,7 +901,7 @@ window.__pip = (function(){
     }
     return false;
   }
-  function computeSaju(year,month,day,hour,minute,hasTime,applyTrueSolar,longitude){
+  function computeSaju(year,month,day,hour,minute,hasTime,applyTrueSolar,longitude,yajasi){
     if(applyTrueSolar===undefined) applyTrueSolar=true;
     if(longitude===undefined) longitude=127.5;
     // 시계 시각 → 세계시: 그 시대의 법정 표준시(1954.3.21~1961.8.9는 UTC+8:30, 서머타임 시행 기간은 +1시간)를 반영한다
@@ -928,11 +934,15 @@ window.__pip = (function(){
       const dte=new Date(Date.UTC(year,month-1,day)); dte.setUTCDate(dte.getUTCDate()+1);
       effY=dte.getUTCFullYear(); effM=dte.getUTCMonth()+1; effD=dte.getUTCDate();
     }
-    const jdn=gregorianToJDN(effY,effM,effD), dIdx=mod(jdn+49,60), dStem=mod(dIdx,10), dBranch=mod(dIdx,12);
+    const jdn=gregorianToJDN(effY,effM,effD), dIdx=mod(jdn+49,60), nStem=mod(dIdx,10); // nStem: 시주 천간 산정용 (23시대는 다음날 일간 기준)
+    // 야자시 적용: 23시대 출생도 일주는 당일 것을 쓴다 (시주는 그대로 다음날 자시)
+    let dayIdx=dIdx;
+    if(yajasi && hasTime && clockHour>=23) dayIdx=mod(gregorianToJDN(year,month,day)+49,60);
+    const dStem=mod(dayIdx,10), dBranch=mod(dayIdx,12);
     let hour_pillar=null;
     if(hasTime){
       const table=[0,1,1,2,2,3,3,4,4,5,5,6,6,7,7,8,8,9,9,10,10,11,11,0];
-      const hBranch=table[clockHour], hgroup=mod(dStem,5), startJa=mod(hgroup*2,10), hStem=mod(startJa+hBranch,10);
+      const hBranch=table[clockHour], hgroup=mod(nStem,5), startJa=mod(hgroup*2,10), hStem=mod(startJa+hBranch,10);
       hour_pillar={stem:hStem,branch:hBranch};
     }
     return {year:{stem:yStem,branch:yBranch}, month:{stem:mStem,branch:mBranch}, day:{stem:dStem,branch:dBranch}, hour:hour_pillar, termIndex, birthJD_UT};
@@ -1912,13 +1922,14 @@ window.__pip = (function(){
     const m=String((e&&e.message)||'').toLowerCase();
     return (e&&e.status===404) || m.includes('no longer available') || m.includes('is not found') || m.includes('not supported for generatecontent') || m.includes('update your code to use models');
   }
-  async function callClaudeOnce(promptText, keyArg, modelArg){
+  async function callClaudeOnce(promptText, keyArg, modelArg, signal){
     const key = String(keyArg||'').trim();
     if(!key){ const e=new Error('Gemini API 키를 먼저 아래의 API 키 설정에서 추가해주세요.'); e.status=400; throw e; }
     const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelArg||orderedModels()[0]}:generateContent?key=${encodeURIComponent(key)}`;
     const resp = await fetch(url, {
       method:'POST', headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({ contents:[{parts:[{text:promptText}]}] })
+      body: JSON.stringify({ contents:[{parts:[{text:promptText}]}] }),
+      signal: signal || undefined
     });
     let data=null;
     try{ data = await resp.json(); }catch(e){ /* 응답이 JSON이 아닌 경우 */ }
@@ -1934,15 +1945,16 @@ window.__pip = (function(){
     return text.trim();
   }
   // 한 키로, 모델을 차례로 써 본다: 모델이 막혀 있거나(새 키는 2.5를 못 씀) 그 모델의 한도가 0이면 다음 모델로
-  async function callWithModels(promptText, key){
+  async function callWithModels(promptText, key, signal){
     const models=orderedModels();
     let lastErr;
     for(let i=0;i<models.length;i++){
       try{
-        const text=await callClaudeOnce(promptText, key, models[i]);
+        const text=await callClaudeOnce(promptText, key, models[i], signal);
         try{ localStorage.setItem(MODEL_STORAGE_NAME, models[i]); }catch(e){}
         return text;
       } catch(e){
+        if(e && e.name==='AbortError') throw e; // 사용자가 중지한 것이므로 다른 모델로 넘어가지 않는다
         lastErr=e;
         const moreModels=i<models.length-1;
         if(moreModels && (isModelError(e) || e.status===429)) continue;
@@ -1952,12 +1964,13 @@ window.__pip = (function(){
     throw lastErr;
   }
   // 한 키로 호출: 일시적 오류(5xx)는 잠깐 대기 후 재시도
-  async function callWithKey(finalPrompt, key, retries){
+  async function callWithKey(finalPrompt, key, retries, signal){
     let lastErr;
     for(let attempt=0; attempt<=retries; attempt++){
       try{
-        return await callWithModels(finalPrompt, key);
+        return await callWithModels(finalPrompt, key, signal);
       } catch(e){
+        if(e && e.name==='AbortError') throw e;
         lastErr = e;
         const transient = e.status && e.status>=500;
         if(attempt<retries && transient){ await sleep(900*(attempt+1)); continue; }
@@ -1967,7 +1980,7 @@ window.__pip = (function(){
     throw lastErr;
   }
   // 등록한 키를 차례로 써 보고, 한도에 걸리거나 못 쓰는 키면 자동으로 다음 키로 넘어간다
-  async function callClaude(promptText, retries){
+  async function callClaude(promptText, retries, signal){
     retries = retries===undefined ? 2 : retries;
     const finalPrompt = promptText + guidelineBlock();
     const list=loadKeyList();
@@ -1978,10 +1991,11 @@ window.__pip = (function(){
     for(let n=0;n<list.length;n++){
       const k=list[(startIdx+n)%list.length];
       try{
-        const text=await callWithKey(finalPrompt, k.key, retries);
+        const text=await callWithKey(finalPrompt, k.key, retries, signal);
         if(k.id!==activeId){ setActiveKeyId(k.id); if(typeof renderKeyList==='function') renderKeyList(); }
         return text;
       } catch(e){
+        if(e && e.name==='AbortError') throw e;
         lastErr=e;
         if(isKeyError(e)){ keyErrCount++; continue; }
         throw e;
@@ -1995,24 +2009,99 @@ window.__pip = (function(){
     throw lastErr;
   }
 
+  // ---- 풀이 복사·공유 / 생성 중지 공통 도우미 ----
+  const aiCtls={reading:null, cp:null, qna:null}; // 질문답변 중 진행 중인 요청의 취소 장치
+  function shareSupported(){ return !!(navigator && navigator.share); }
+  function buildShareBarHTML(){
+    return '<button type="button" class="share-btn" data-share="copy">복사</button>'
+      + (shareSupported() ? '<button type="button" class="share-btn" data-share="share">공유</button>' : '')
+      + '<span class="share-msg"></span>';
+  }
+  function showShareBar(box){
+    let bar=box.nextElementSibling;
+    if(!(bar && bar.classList && bar.classList.contains('share-bar'))){
+      bar=document.createElement('div'); bar.className='share-bar'; bar.innerHTML=buildShareBarHTML();
+      box.insertAdjacentElement('afterend', bar);
+    }
+    bar.style.display='flex';
+  }
+  function hideShareBar(box){
+    const bar=box.nextElementSibling;
+    if(bar && bar.classList && bar.classList.contains('share-bar')) bar.style.display='none';
+  }
+  // 복사·공유 버튼 (별도 창에서도 눌러지도록, 버튼이 들어 있는 창의 클립보드·공유 기능을 쓴다)
+  document.addEventListener('click', async (e)=>{
+    const t=e.target, b=(t && t.closest) ? t.closest('[data-share]') : null;
+    if(!b) return;
+    const bar=b.closest('.share-bar'), msg=bar ? bar.querySelector('.share-msg') : null;
+    const item=b.closest('.qna-item');
+    let text='';
+    if(item){
+      const q=item.firstElementChild, ans=item.querySelector('.ai-box');
+      text=(q?q.textContent.trim():'')+'\n\n'+(ans?ans.textContent.trim():'');
+    } else {
+      const box=bar ? bar.previousElementSibling : null; text=box ? box.textContent.trim() : '';
+    }
+    if(!text) return;
+    const doc=b.ownerDocument, win=doc.defaultView||window;
+    const say=(m)=>{ if(msg){ msg.textContent=m; setTimeout(()=>{ msg.textContent=''; },2500); } };
+    if(b.dataset.share==='share'){
+      try{ await win.navigator.share({text}); }
+      catch(err){ if(!err || err.name!=='AbortError') say('공유하지 못했어요. 복사를 이용해 주세요.'); }
+      return;
+    }
+    try{
+      if(win.navigator.clipboard && win.navigator.clipboard.writeText){ await win.navigator.clipboard.writeText(text); say('복사했어요'); return; }
+      throw new Error('no clipboard');
+    }catch(err){
+      try{
+        const ta=doc.createElement('textarea'); ta.value=text; ta.style.position='fixed'; ta.style.opacity='0';
+        doc.body.appendChild(ta); ta.select(); const ok=doc.execCommand('copy'); ta.remove();
+        say(ok?'복사했어요':'복사하지 못했어요');
+      }catch(e2){ say('복사하지 못했어요'); }
+    }
+  });
+  // 질문답변 버튼이 '중지'로 바뀐 동안 그 버튼을 누르면 진행 중인 요청을 멈춘다
+  document.addEventListener('click', (e)=>{
+    const t=e.target, b=(t && t.closest) ? t.closest('[data-ai-stop]') : null;
+    if(!b) return;
+    const c=aiCtls[b.dataset.aiStop]; if(c) c.abort();
+  });
+
   function wireAI(btnId, loadingId, errorId, boxId, promptBuilder, onSuccess){
     const btn=document.getElementById(btnId), loading=document.getElementById(loadingId);
     const err=document.getElementById(errorId), box=document.getElementById(boxId);
     const originalLabel = btn.textContent;
+    let ctl=null;
+    // 로딩 줄 안에 '중지' 버튼을 한 번만 만든다
+    let stop=loading.querySelector('.ai-stop');
+    if(!stop){
+      stop=document.createElement('button'); stop.type='button'; stop.className='ai-stop';
+      stop.textContent='중지'; stop.title='AI 풀이 만들기를 멈춥니다';
+      loading.appendChild(stop);
+    }
+    stop.onclick=()=>{ if(ctl) ctl.abort(); };
     btn.addEventListener('click', async ()=>{
       err.classList.remove('show'); err.textContent=''; box.classList.remove('show'); box.textContent='';
+      hideShareBar(box);
+      ctl=new AbortController();
       loading.classList.add('show'); btn.disabled=true; btn.textContent='불러오는 중...';
       try{
-        const text = await callClaude(promptBuilder());
+        const text = await callClaude(promptBuilder(), undefined, ctl.signal);
         if(!text){ throw new Error('빈 응답을 받았습니다.'); }
         box.textContent = text;
         box.classList.add('show');
+        showShareBar(box);
         if(onSuccess) onSuccess(text);
       } catch(e){
-        err.innerHTML = 'AI 풀이를 불러오지 못했습니다 (' + e.message + ').<br>서버가 일시적으로 혼잡할 수 있어요. 버튼을 다시 눌러 재시도해주세요.';
+        if(e && e.name==='AbortError'){
+          err.textContent='AI 풀이 만들기를 중지했습니다. 버튼을 다시 누르면 새로 만들어요.';
+        } else {
+          err.innerHTML = 'AI 풀이를 불러오지 못했습니다 (' + e.message + ').<br>서버가 일시적으로 혼잡할 수 있어요. 버튼을 다시 눌러 재시도해주세요.';
+        }
         err.classList.add('show');
       } finally {
-        loading.classList.remove('show'); btn.disabled=false; btn.textContent=originalLabel;
+        ctl=null; loading.classList.remove('show'); btn.disabled=false; btn.textContent=originalLabel;
       }
     });
   }
@@ -2676,19 +2765,20 @@ window.__pip = (function(){
     }
     const hasTime=!chkUnknown.checked, hour=hasTime?+selHour.value:12, minute=hasTime?+selMinute.value:0;
     const applyTrueSolar=document.getElementById('chkTrueSolar').checked;
+    const yajasi=document.getElementById('chkYajasi').checked;
     const longitude=+document.getElementById('selLocation').value;
     const shiChoice=hasTime?selShi.value:'';
     const shiLabel=shiChoice?shiLabelOf(shiChoice):'';
-    const s=computeSaju(year,month,day,hour,minute,hasTime,applyTrueSolar,longitude);
+    const s=computeSaju(year,month,day,hour,minute,hasTime,applyTrueSolar,longitude,yajasi);
 
-    renderAll(s, {year, month, day, hour, minute, hasTime, isMale, convertedNote, applyTrueSolar, longitude, edited:false, name, shiLabel});
+    renderAll(s, {year, month, day, hour, minute, hasTime, isMale, convertedNote, applyTrueSolar, longitude, yajasi, edited:false, name, shiLabel});
     exitEditMode();
 
     if(!suppressAutoSave){
       addRecord({
         id: Date.now()+'_'+Math.random().toString(36).slice(2,7),
         name, isMale, calType, inYear, inMonth, inDay, isLeapMonth,
-        hasTime, hour, minute, applyTrueSolar, longitude, shiChoice,
+        hasTime, hour, minute, applyTrueSolar, longitude, shiChoice, yajasi,
         savedAt: new Date().toISOString()
       });
     }
@@ -2806,7 +2896,7 @@ window.__pip = (function(){
 
   // ---- 계산 결과 렌더링 (최초 계산 및 수동 수정 적용 시 공용으로 사용) ----
   function renderAll(s, meta){
-    const {year, month, day, hour, minute, hasTime, isMale:im, convertedNote, applyTrueSolar, longitude, edited, name, shiLabel} = meta;
+    const {year, month, day, hour, minute, hasTime, isMale:im, convertedNote, applyTrueSolar, longitude, yajasi, edited, name, shiLabel} = meta;
     const dayStemIdx=s.day.stem;
     selectedDwIdx=null; selectedSwYear=null;
     const btnDwP=document.getElementById('btnDwPillar'), btnSwP=document.getElementById('btnSwPillar');
@@ -2845,6 +2935,7 @@ window.__pip = (function(){
       bits.push(hasTime? (shiLabel? shiLabel : String(hour).padStart(2,'0')+':'+String(minute).padStart(2,'0')) : '시간 미상');
       bits.push(im?'남자':'여자');
       if(hasTime) bits.push(applyTrueSolar?`진태양시 보정 적용${longitude&&longitude!==127.5?`(경도 ${longitude}°)`:''}`:'보정 미적용(시계 시각 그대로)');
+      if(hasTime && yajasi) bits.push('야자시 적용(23시대는 당일 일주)');
       if(edited) bits.push('✎ 직접 수정됨');
       const el=document.getElementById('introNote');
       if(el) el.textContent = bits.join(' · ');
@@ -2896,7 +2987,7 @@ window.__pip = (function(){
     }
     document.getElementById('swList').innerHTML = swRows;
 
-    state = {s, dayStemIdx, counts, total, year, month, day, hour, minute, hasTime, isMale:im, strength, ys, dayElem, applyTrueSolar, longitude, dw, name, shiLabel};
+    state = {s, dayStemIdx, counts, total, year, month, day, hour, minute, hasTime, isMale:im, strength, ys, dayElem, applyTrueSolar, longitude, yajasi, dw, name, shiLabel};
     qnaHistory = [];
     readingQnaHistory = []; lastReadingAiText = null;
     renderPillarsRow();
@@ -2993,11 +3084,11 @@ window.__pip = (function(){
     try{
       if(editMode==='date'){
         const ny=+editYear.value, nm=+editMonth.value, nd=+editDay.value, nh=+editHour.value, nmi=+editMinute.value;
-        const newS = computeSaju(ny, nm, nd, nh, nmi, state.hasTime, state.applyTrueSolar, state.longitude);
+        const newS = computeSaju(ny, nm, nd, nh, nmi, state.hasTime, state.applyTrueSolar, state.longitude, state.yajasi);
         renderAll(newS, {
           year:ny, month:nm, day:nd, hour:nh, minute:nmi,
           hasTime: state.hasTime, isMale: state.isMale, convertedNote: ' (생년월일시 수정됨)',
-          applyTrueSolar: state.applyTrueSolar, longitude: state.longitude, edited: true, name: state.name, shiLabel: ''
+          applyTrueSolar: state.applyTrueSolar, longitude: state.longitude, yajasi: state.yajasi, edited: true, name: state.name, shiLabel: ''
         });
         exitEditMode();
         return;
@@ -3017,7 +3108,7 @@ window.__pip = (function(){
       renderAll(newS, {
         year: state.year, month: state.month, day: state.day, hour: state.hour, minute: state.minute,
         hasTime: state.hasTime, isMale: state.isMale, convertedNote: ' (수동 수정됨)',
-        applyTrueSolar: state.applyTrueSolar, longitude: state.longitude, edited: true, name: state.name, shiLabel: state.shiLabel
+        applyTrueSolar: state.applyTrueSolar, longitude: state.longitude, yajasi: state.yajasi, edited: true, name: state.name, shiLabel: state.shiLabel
       });
       exitEditMode();
     } catch(err){
@@ -3395,6 +3486,66 @@ window.__pip = (function(){
       return `${d.getFullYear()}.${d.getMonth()+1}.${d.getDate()} ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')} 저장`;
     }catch(e){ return ''; }
   }
+
+  // ---- 저장된 사주 백업 (파일로 내려받기 / 불러오기) ----
+  function cleanRecord(r){
+    if(!r || typeof r!=='object') return null;
+    const n=(v)=>Number.isFinite(+v) ? +v : null;
+    const inYear=n(r.inYear), inMonth=n(r.inMonth), inDay=n(r.inDay);
+    if(inYear===null||inMonth===null||inDay===null||inYear<1||inYear>2200||inMonth<1||inMonth>12||inDay<1||inDay>31) return null;
+    const hasTime=!!r.hasTime, fresh=()=>Date.now()+'_'+Math.random().toString(36).slice(2,7);
+    const id=String(r.id||'').replace(/[^\w.-]/g,'').slice(0,60) || fresh();
+    return {
+      id, name:String(r.name||'').slice(0,60), isMale:!!r.isMale, calType:r.calType==='lunar'?'lunar':'solar',
+      inYear, inMonth, inDay, isLeapMonth:!!r.isLeapMonth, hasTime,
+      hour: hasTime ? Math.min(23,Math.max(0,n(r.hour)||0)) : 12, minute: hasTime ? Math.min(59,Math.max(0,n(r.minute)||0)) : 0,
+      applyTrueSolar: r.applyTrueSolar!==false, longitude: n(r.longitude)===null ? 127.5 : n(r.longitude),
+      shiChoice: typeof r.shiChoice==='string' ? r.shiChoice.replace(/[^\w.:-]/g,'').slice(0,20) : '',
+      yajasi: !!r.yajasi,
+      savedAt: (typeof r.savedAt==='string' && !isNaN(Date.parse(r.savedAt))) ? r.savedAt : new Date().toISOString()
+    };
+  }
+  function recordSig(r){
+    return [String(r.name||''), !!r.isMale, r.calType==='lunar'?'l':'s', +r.inYear, +r.inMonth, +r.inDay, !!r.isLeapMonth, !!r.hasTime,
+      r.hasTime?+r.hour:'', r.hasTime?+r.minute:'', r.applyTrueSolar!==false, +(r.longitude===undefined?127.5:r.longitude), !!r.yajasi].join('|');
+  }
+  function readFileText(file){
+    return new Promise((res,rej)=>{ const fr=new FileReader(); fr.onload=()=>res(String(fr.result||'')); fr.onerror=()=>rej(new Error('파일을 읽지 못했어요.')); fr.readAsText(file,'utf-8'); });
+  }
+  function backupSave(){
+    const data={ app:'saju-wongook', version:1, exportedAt:new Date().toISOString(), records:loadRecords(), guideline:(loadGuideline()||'') };
+    const blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json'});
+    const d=new Date(), pad=(x)=>String(x).padStart(2,'0');
+    const a=document.createElement('a');
+    a.href=URL.createObjectURL(blob); a.download='사주백업_'+d.getFullYear()+pad(d.getMonth()+1)+pad(d.getDate())+'.json';
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(()=>URL.revokeObjectURL(a.href),1500);
+    return data.records.length;
+  }
+  async function backupLoad(file){
+    const data=JSON.parse(await readFileText(file));
+    if(!data || data.app!=='saju-wongook' || !Array.isArray(data.records)) throw new Error('이 앱에서 만든 백업 파일이 아니에요.');
+    const cur=loadRecords(), seen=new Set(cur.map(recordSig)), ids=new Set(cur.map(r=>r.id));
+    let added=0, skipped=0;
+    data.records.forEach(raw=>{
+      const c=cleanRecord(raw);
+      if(!c || seen.has(recordSig(c)) || ids.has(c.id)){ skipped++; return; }
+      seen.add(recordSig(c)); ids.add(c.id); cur.push(c); added++;
+    });
+    cur.sort((x,y)=>String(y.savedAt).localeCompare(String(x.savedAt)));
+    if(cur.length>100) cur.length=100;
+    saveRecords(cur);
+    let guideNote='';
+    const g=typeof data.guideline==='string' ? data.guideline.trim() : '';
+    if(g && g!==(loadGuideline()||'').trim()){
+      if(!(loadGuideline()||'').trim() || confirm('현재 답변 지침을 백업 파일의 지침으로 바꿀까요?')){
+        saveGuideline(g);
+        const ge=document.getElementById('guideShared'); if(ge){ ge.value=g; ge.dispatchEvent(new Event('input',{bubbles:true})); }
+        guideNote=' · 답변 지침도 불러왔어요';
+      }
+    }
+    return {added, skipped, guideNote};
+  }
   function renderRecordsList(){
     document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
     document.querySelectorAll('.reading-panel').forEach(p=>p.classList.remove('show'));
@@ -3403,6 +3554,13 @@ window.__pip = (function(){
     panel.innerHTML = `
       <h4>저장된 사주</h4>
       <p style="font-size:12px;color:var(--ink-soft);">사주를 계산할 때마다 이 브라우저에 자동으로 저장돼요(최근 100개까지). 클릭하면 다시 불러와서 계산해요.</p>
+      <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin-bottom:12px;">
+        <button type="button" class="go-btn" id="btnBackupSave" style="width:auto; padding:8px 14px; background:#fffdf7; color:var(--ink); border-color:var(--rule);">백업 저장</button>
+        <button type="button" class="go-btn" id="btnBackupLoad" style="width:auto; padding:8px 14px; background:#fffdf7; color:var(--ink); border-color:var(--rule);">백업 불러오기</button>
+        <input type="file" id="fileBackup" accept="application/json,.json" style="display:none;">
+        <span id="backupMsg" style="font-size:12px; color:var(--ink-soft);"></span>
+      </div>
+      <p style="font-size:11.5px;color:var(--ink-soft);margin-top:-4px;">백업 파일에는 저장된 사주와 답변 지침이 들어 있고, API 키는 들어 있지 않아요.</p>
       <div style="position:relative; margin-bottom:14px;">
         <span style="position:absolute; left:12px; top:50%; transform:translateY(-50%); color:var(--ink-soft); font-size:14px; pointer-events:none;">🔍</span>
         <input type="text" id="recordSearchInput" placeholder="이름으로 찾기..." style="width:100%; font-family:inherit; font-size:13.5px; padding:10px 12px 10px 34px; border:1px solid var(--rule); border-radius:8px; background:#fffdf7;">
@@ -3411,6 +3569,25 @@ window.__pip = (function(){
     `;
     panel.classList.add('show');
     renderRecordsBody(list);
+    (function(){
+      const msg=document.getElementById('backupMsg'), file=document.getElementById('fileBackup');
+      const say=(m)=>{ if(msg) msg.textContent=m; };
+      document.getElementById('btnBackupSave').addEventListener('click',()=>{
+        if(loadRecords().length===0 && !(loadGuideline()||'').trim()){ say('백업할 내용이 아직 없어요.'); return; }
+        say('백업 파일을 저장했어요 ('+backupSave()+'개)');
+      });
+      document.getElementById('btnBackupLoad').addEventListener('click',()=>file.click());
+      file.addEventListener('change', async ()=>{
+        const f=file.files && file.files[0]; if(!f) return;
+        try{
+          const r=await backupLoad(f);
+          renderRecordsList();
+          const m2=document.getElementById('backupMsg');
+          if(m2) m2.textContent='불러왔어요: '+r.added+'개 추가'+(r.skipped?' (이미 있거나 읽을 수 없는 '+r.skipped+'개 제외)':'')+r.guideNote;
+        }catch(e){ say('불러오지 못했어요: '+e.message); }
+        file.value='';
+      });
+    })();
     document.getElementById('recordSearchInput').addEventListener('input',(e)=>{
       const q=e.target.value.trim().toLowerCase();
       const filtered = q ? list.filter(r=>(r.name||'').toLowerCase().includes(q)) : list;
@@ -3467,6 +3644,7 @@ window.__pip = (function(){
     selHour.style.opacity = rec.hasTime?1:0.4; selMinute.style.opacity = rec.hasTime?1:0.4;
     if(rec.hasTime){ selHour.value = rec.hour; selMinute.value = rec.minute; }
     document.getElementById('chkTrueSolar').checked = rec.applyTrueSolar!==false;
+    { const cy=document.getElementById('chkYajasi'); if(cy) cy.checked=!!rec.yajasi; }
     if(rec.longitude!==undefined) document.getElementById('selLocation').value = String(rec.longitude);
     selShi.disabled = !rec.hasTime; selShi.style.opacity = rec.hasTime?1:0.4;
     buildShiOptions();
@@ -3801,7 +3979,7 @@ window.__pip = (function(){
     if(readingQnaHistory.length===0){ box.innerHTML='<p style="font-size:12px;color:var(--ink-soft);margin:0;">아직 질문이 없습니다. 아래 칸에 질문을 입력해보세요.</p>'; return; }
     box.innerHTML = readingQnaHistory.map(item=>{
       let answerHtml;
-      if(item.a!=null) answerHtml=`<div class="ai-box show" style="margin-top:0;">${escapeHtml(item.a)}</div>`;
+      if(item.a!=null) answerHtml=`<div class="ai-box show" style="margin-top:0;">${escapeHtml(item.a)}</div><div class="share-bar" style="display:flex;">${buildShareBarHTML()}</div>`;
       else if(item.err) answerHtml=`<div class="ai-box show" style="margin-top:0; color:var(--seal);">⚠️ ${escapeHtml(item.err)}</div>`;
       else answerHtml=`<div class="ai-box show" style="margin-top:0; color:var(--ink-soft);">AI가 답변을 준비하고 있어요…</div>`;
       return `
@@ -3819,7 +3997,8 @@ window.__pip = (function(){
     if(!q) return;
     const err=document.getElementById('readingQnaError'), btn=document.getElementById('readingQnaBtn');
     err.classList.remove('show'); err.textContent='';
-    readingQnaBusy=true; btn.disabled=true; btn.textContent='답변 중...';
+    readingQnaBusy=true; btn.disabled=false; btn.textContent='중지'; setTimeout(()=>{ if(readingQnaBusy) btn.dataset.aiStop='reading'; },0); // 답변 중에는 이 버튼이 '중지' 버튼이 된다 (지금 누른 클릭이 곧바로 중지로 처리되지 않도록 한 박자 뒤에 표시)
+    const ctl=new AbortController(); aiCtls.reading=ctl;
 
     const item={q, a:null, err:null};
     readingQnaHistory.push(item);
@@ -3837,16 +4016,17 @@ window.__pip = (function(){
       const histBlock = past ? `\n\n[지금까지 나눈 대화]\n${past}\n\n위 대화를 기억하고 이어서 답해줘. 질문에 "그럼", "그 시기", "그 사람", "아까 말한 것"처럼 앞 내용을 가리키는 말이 있으면 위 대화에서 찾아 이해하고, 이미 설명한 내용은 반복하지 말고 이어서 새로운 내용을 답해줘.` : '';
       const priorReadingBlock = lastReadingAiText ? `\n\n[방금 본 AI 심층 사주풀이 전문]\n${lastReadingAiText}\n\n위 풀이 내용을 참고해서, 질문이 그 풀이의 특정 부분을 가리키면 그 맥락을 이어서 답해줘.` : '';
       const prompt = `다음은 한 사람의 사주 정보입니다.\n\n${summary}${ctxBlock}${priorReadingBlock}${histBlock}${expertGyeokGuidance()}\n\n반드시 위 [오늘 날짜]를 기준으로 '올해', '내년', '다음 달', '이번 달' 같은 시점을 해석하고, 이미 지나간 연도나 달을 앞으로 일어날 일처럼 말하지 마. 이 사주 정보(오행, 십신, 지장간, 십이운성, 형충회합, 격국, 용신, 대운 등)를 참고해서 아래 질문에 답변해줘. 명리학적으로 판단되는 결론을 첫 문장에서 직설적으로 먼저 제시한 뒤, 그 결론을 뒷받침하는 데 실제로 필요한 근거만 짚어서 답해줘. [질문에 답하는 형식] 년주·월주·일주·시주 간지나 오행 개수처럼 이미 위에 다 나와 있는 원국 정보를 처음부터 다시 설명하거나 요약하지 말고, 이번 질문과 직접 관련된 글자·근거만 짧게 언급해줘. 앞서 나눈 대화에서 이미 설명한 원국 설명을 또 반복하지도 마. 결론을 첫 문장에서 먼저 밝힌 뒤에는 분량을 아끼지 말고 충분히 자세하게 풀어줘. 다만 같은 말을 표현만 바꿔 되풀이하거나 질문을 다시 풀어 쓰면서 분량을 채우지 말고, 문단마다 새로운 내용을 더해줘. 새 내용은 서로 다른 각도에서 가져와줘. 예를 들면 가까운 시기와 먼 시기로 나눠 보기, 잘 풀리는 조건과 어긋나는 조건, 주의할 점, 실행하기 전에 확인할 점 같은 것들이야. 다만 이 각도들은 질문에 실제로 해당하는 것만 골라 쓰고, 해당하지 않는 것을 억지로 채우지는 마. 근거 없이 결론만 던지지도 마. 문단을 나눠 읽기 편하게 쓰되, 소제목·번호 목록·마크다운 기호(** 등) 없이 일반 글로 작성해줘.\n\n질문: ${q}`;
-      const answer = await callClaude(prompt);
+      const answer = await callClaude(prompt, undefined, ctl.signal);
       item.a = answer||'답변을 받지 못했습니다.';
     } catch(e){
-      item.err = '답변을 불러오지 못했습니다 (' + e.message + '). 같은 질문을 다시 보내 주세요.';
+      item.err = (e && e.name==='AbortError') ? '답변 만들기를 중지했습니다. 같은 질문을 다시 보내 주세요.' : '답변을 불러오지 못했습니다 (' + e.message + '). 같은 질문을 다시 보내 주세요.';
       const inp=document.getElementById('readingQnaInput');
       if(inp && !inp.value){ inp.value=q; autoGrow(inp); }
     } finally {
       readingQnaBusy=false;
       const b=document.getElementById('readingQnaBtn');
-      if(b){ b.disabled=false; b.textContent='질문하기'; }
+      if(b){ b.disabled=false; b.textContent='질문하기'; delete b.dataset.aiStop; }
+      aiCtls.reading=null;
       renderReadingQnaHistory();
       scrollToLastQna('readingQnaHistoryBox');
     }
@@ -4151,7 +4331,7 @@ window.__pip = (function(){
     if(cpQnaHistory.length===0){ box.innerHTML='<p style="font-size:12px;color:var(--ink-soft);margin:0;">아직 질문이 없습니다. 아래 칸에 질문을 입력해보세요.</p>'; return; }
     box.innerHTML = cpQnaHistory.map(item=>{
       let answerHtml;
-      if(item.a!=null) answerHtml=`<div class="ai-box show" style="margin-top:0;">${escapeHtml(item.a)}</div>`;
+      if(item.a!=null) answerHtml=`<div class="ai-box show" style="margin-top:0;">${escapeHtml(item.a)}</div><div class="share-bar" style="display:flex;">${buildShareBarHTML()}</div>`;
       else if(item.err) answerHtml=`<div class="ai-box show" style="margin-top:0; color:var(--seal);">⚠️ ${escapeHtml(item.err)}</div>`;
       else answerHtml=`<div class="ai-box show" style="margin-top:0; color:var(--ink-soft);">AI가 답변을 준비하고 있어요…</div>`;
       return `
@@ -4169,7 +4349,8 @@ window.__pip = (function(){
     if(!q) return;
     const err=document.getElementById('cpQnaError'), btn=document.getElementById('cpQnaBtn');
     err.classList.remove('show'); err.textContent='';
-    cpQnaBusy=true; btn.disabled=true; btn.textContent='답변 중...';
+    cpQnaBusy=true; btn.disabled=false; btn.textContent='중지'; setTimeout(()=>{ if(cpQnaBusy) btn.dataset.aiStop='cp'; },0); // 답변 중에는 이 버튼이 '중지' 버튼이 된다 (지금 누른 클릭이 곧바로 중지로 처리되지 않도록 한 박자 뒤에 표시)
+    const ctl=new AbortController(); aiCtls.cp=ctl;
 
     const item={q, a:null, err:null};
     cpQnaHistory.push(item);
@@ -4185,16 +4366,17 @@ window.__pip = (function(){
       const histBlock = past ? `\n\n[지금까지 나눈 대화]\n${past}\n\n위 대화를 기억하고 이어서 답해줘. 질문에 "그럼", "그 사람", "아까 말한 것"처럼 앞 내용을 가리키는 말이 있으면 위 대화에서 찾아 이해하고, 이미 설명한 내용은 반복하지 말고 이어서 새로운 내용을 답해줘.` : '';
       const crossRelBlock = (crossRelLines&&crossRelLines.length) ? `\n\n[두 사람 사이의 형충회합]\n${crossRelLines.join('\n')}` : '\n\n[두 사람 사이의 형충회합]\n두드러진 관계 없음';
       const prompt = `다음은 두 사람의 사주 정보입니다.\n\n[나의 사주]\n${myFull}\n\n[상대방의 사주]\n${partnerFull}\n\n[서로에 대한 십신 관계]\n${crossLines.join('\n')}${crossRelBlock}\n\n[간단 궁합 결과]\n일간 오행 관계: ${elemVerdict} (${elemText})\n띠 관계: ${branchVerdict} (${branchText})\n납음오행 관계: ${napVerdict} (나: ${myNap.name}/${myNap.elem}, 상대: ${pNap.name}/${pNap.elem} — ${napText})${ctxBlock}${histBlock}${expertGyeokGuidance()}\n\n반드시 위 두 사람의 사주 정보(오행, 십신, 지장간, 십이운성, 형충회합, 용신, 대운 등)와 서로에 대한 십신 관계, 두 사람 사이의 형충회합, 납음오행 관계를 참고해서 아래 질문에 답변해줘. 명리학적으로 판단되는 결론을 첫 문장에서 직설적으로 먼저 제시한 뒤(예/아니오, 좋다/신중해야 한다, 잘 맞는다/유의해야 한다 등 명확한 입장), 그 결론을 뒷받침하는 데 실제로 필요한 근거만 짚어서 답해줘. 두 사람 각자의 년주·월주·일주·시주 간지나 오행 개수처럼 이미 위에 다 나와 있는 원국 정보를 처음부터 다시 설명하거나 요약하지 말고, 이번 질문과 직접 관련된 글자·근거만 짧게 언급해줘. 앞서 나눈 대화에서 이미 설명한 원국 설명을 또 반복하지도 마. 핵심 위주로 간결하게 답하되, 근거 없이 결론만 던지지는 말고 꼭 필요한 만큼만 설명해줘. 문단을 나눠 읽기 편하게 쓰되, 소제목·번호 목록·마크다운 기호(** 등) 없이 일반 글로 작성해줘.\n\n질문: ${q}`;
-      const answer = await callClaude(prompt);
+      const answer = await callClaude(prompt, undefined, ctl.signal);
       item.a = answer||'답변을 받지 못했습니다.';
     } catch(e){
-      item.err = '답변을 불러오지 못했습니다 (' + e.message + '). 같은 질문을 다시 보내 주세요.';
+      item.err = (e && e.name==='AbortError') ? '답변 만들기를 중지했습니다. 같은 질문을 다시 보내 주세요.' : '답변을 불러오지 못했습니다 (' + e.message + '). 같은 질문을 다시 보내 주세요.';
       const inp=document.getElementById('cpQnaInput');
       if(inp && !inp.value){ inp.value=q; autoGrow(inp); }
     } finally {
       cpQnaBusy=false;
       const b=document.getElementById('cpQnaBtn');
-      if(b){ b.disabled=false; b.textContent='질문하기'; }
+      if(b){ b.disabled=false; b.textContent='질문하기'; delete b.dataset.aiStop; }
+      aiCtls.cp=null;
       renderCpQnaHistory();
     }
   }
@@ -4599,7 +4781,7 @@ window.__pip = (function(){
     // 오래된 질문이 위, 최신 질문이 아래 (채팅 방식). 질문은 보내자마자 올라가고, 답은 도착하면 채워진다.
     box.innerHTML = qnaHistory.map(item=>{
       let answerHtml;
-      if(item.a!=null) answerHtml=`<div class="ai-box show" style="margin-top:0;">${escapeHtml(item.a)}</div>`;
+      if(item.a!=null) answerHtml=`<div class="ai-box show" style="margin-top:0;">${escapeHtml(item.a)}</div><div class="share-bar" style="display:flex;">${buildShareBarHTML()}</div>`;
       else if(item.err) answerHtml=`<div class="ai-box show" style="margin-top:0; color:var(--seal);">⚠️ ${escapeHtml(item.err)}</div>`;
       else answerHtml=`<div class="ai-box show" style="margin-top:0; color:var(--ink-soft);">AI가 답변을 준비하고 있어요…</div>`;
       return `
@@ -4622,7 +4804,8 @@ window.__pip = (function(){
     if(!q) return;
     const err=document.getElementById('qnaError'), btn=document.getElementById('qnaBtn');
     err.classList.remove('show'); err.textContent='';
-    qnaBusy=true; btn.disabled=true; btn.textContent='답변 중...';
+    qnaBusy=true; btn.disabled=false; btn.textContent='중지'; setTimeout(()=>{ if(qnaBusy) btn.dataset.aiStop='qna'; },0); // 답변 중에는 이 버튼이 '중지' 버튼이 된다 (지금 누른 클릭이 곧바로 중지로 처리되지 않도록 한 박자 뒤에 표시)
+    const ctl=new AbortController(); aiCtls.qna=ctl;
 
     // 엔터를 치는 즉시 질문을 창에 올리고 입력칸을 비운다 (답은 나중에 채워진다)
     const item={q, a:null, err:null};
@@ -4641,17 +4824,18 @@ window.__pip = (function(){
       const past = qnaHistory.filter(it=>it!==item && it.a!=null).slice(-10).map((it,i)=>`Q${i+1}. ${it.q}\nA${i+1}. ${it.a}`).join('\n\n');
       const histBlock = past ? `\n\n[지금까지 나눈 대화]\n${past}\n\n위 대화를 기억하고 이어서 답해줘. 질문에 "그럼", "그 시기", "그 사람", "아까 말한 것"처럼 앞 내용을 가리키는 말이 있으면 위 대화에서 찾아 이해하고, 이미 설명한 내용은 반복하지 말고 이어서 새로운 내용을 답해줘.` : '';
       const prompt = `다음은 질문자의 사주 정보입니다.\n\n${summary}${ctxBlock}${histBlock}${expertGyeokGuidance()}\n\n반드시 위 [오늘 날짜]를 기준으로 '올해', '내년', '다음 달', '이번 달' 같은 시점을 해석하고, 이미 지나간 연도나 달을 앞으로 일어날 일처럼 말하지 마. 이 사주 정보(오행, 십신, 지장간, 십이운성, 형충회합, 용신, 대운 등)를 참고해서 아래 질문에 답변해줘. 명리학적으로 판단되는 결론을 첫 문장에서 직설적으로 먼저 제시한 뒤(예/아니오, 좋다/신중해야 한다, 적합하다/적합하지 않다 등 명확한 입장), 그 결론을 뒷받침하는 데 실제로 필요한 근거만 짚어서 답해줘. 년주·월주·일주·시주 간지나 오행 개수처럼 이미 위에 다 나와 있는 원국 정보를 처음부터 다시 설명하거나 요약하지 말고, 이번 질문과 직접 관련된 글자·근거만 짧게 언급해줘. 앞서 나눈 대화에서 이미 설명한 원국 설명을 또 반복하지도 마. 결론을 첫 문장에서 먼저 밝힌 뒤에는 분량을 아끼지 말고 충분히 자세하게 풀어줘. 다만 같은 말을 표현만 바꿔 되풀이하거나 질문을 다시 풀어 쓰면서 분량을 채우지 말고, 문단마다 새로운 내용을 더해줘. 새 내용은 서로 다른 각도에서 가져와줘. 예를 들면 가까운 시기와 먼 시기로 나눠 보기, 잘 풀리는 조건과 어긋나는 조건, 주의할 점, 실행하기 전에 확인할 점 같은 것들이야. 다만 이 각도들은 질문에 실제로 해당하는 것만 골라 쓰고, 해당하지 않는 것을 억지로 채우지는 마. 근거 없이 결론만 던지지도 마. 문단을 나눠 읽기 편하게 쓰되, 소제목·번호 목록·마크다운 기호(** 등) 없이 일반 글로 작성해줘.\n\n질문: ${q}`;
-      const answer = await callClaude(prompt);
+      const answer = await callClaude(prompt, undefined, ctl.signal);
       item.a = answer||'답변을 받지 못했습니다.';
     } catch(e){
-      item.err = '답변을 불러오지 못했습니다 (' + e.message + '). 같은 질문을 다시 보내 주세요.';
+      item.err = (e && e.name==='AbortError') ? '답변 만들기를 중지했습니다. 같은 질문을 다시 보내 주세요.' : '답변을 불러오지 못했습니다 (' + e.message + '). 같은 질문을 다시 보내 주세요.';
       // 방금 보낸 질문을 입력칸에 되돌려 놓아서, 다시 쓰지 않고 엔터만 치면 되게 한다
       const inp=document.getElementById('qnaInput');
       if(inp && !inp.value){ inp.value=q; autoGrow(inp); }
     } finally {
       qnaBusy=false;
       const b=document.getElementById('qnaBtn');
-      if(b){ b.disabled=false; b.textContent='질문하기'; }
+      if(b){ b.disabled=false; b.textContent='질문하기'; delete b.dataset.aiStop; }
+      aiCtls.qna=null;
       renderQnaHistory();
       scrollToLastQna();
     }
