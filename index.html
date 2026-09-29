@@ -271,7 +271,11 @@
 
   #inpSwYear::-webkit-outer-spin-button, #inpSwYear::-webkit-inner-spin-button{ -webkit-appearance:none; margin:0; }
   #inpSwYear{ -moz-appearance:textfield; appearance:textfield; }
-  #dwSwBar > *{ flex:0 0 auto; }
+  /* 위쪽 탭 줄과 양 끝이 맞도록 버튼을 가로로만 늘린다 (세로 크기·글자 크기·간격은 그대로) */
+  #dwSwBar > *{ flex:1 1 auto; text-align:center; }
+  #dwSwBar > div > button{ flex:1 1 auto; }
+  #swYearBox > button{ flex:0 0 auto; }
+  #swYearBox > input{ flex:1 1 0; min-width:44px; width:auto !important; box-sizing:border-box; }
 </style>
 
 </head>
@@ -380,22 +384,7 @@
       </div>
       <button type="button" id="btnShowInputCard" title="생년월일시 다시 입력하기" class="go-btn" style="width:auto; padding:5px 6px; font-size:10.5px; font-weight:600; background:#fffdf7; color:var(--ink); border-color:var(--rule); display:none; white-space:nowrap;">사주입력</button>
       <button type="button" id="btnEditToggle" title="원국 간지·생년월일시를 직접 고쳐 보기" class="go-btn" style="width:auto; padding:5px 6px; font-size:10.5px; font-weight:600; background:#fffdf7; color:var(--ink); border-color:var(--rule); display:inline-block; white-space:nowrap;">사주 수정</button>
-    </div>
-
-    <div class="fold-card" style="margin-bottom:12px;">
-      <div class="fold-head" style="display:flex; align-items:center; gap:10px; cursor:pointer; min-width:0; padding:13px; background:#3d7a5c; color:#ffffff; border:1px solid #2f6148; border-radius:8px; font-weight:700; letter-spacing:0.04em;">
-        <span class="fold-caret" style="flex:none; font-size:14pt;">▸</span>
-        <span style="flex:none; font-size:14pt; font-weight:700;">현재 상황</span>
-        <span class="fold-preview" style="flex:1; min-width:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; font-size:14pt; font-weight:400; opacity:0.9;"></span>
-      </div>
-      <div class="fold-body" style="display:none; margin-top:6px; background:rgba(255,252,244,0.85); border:1px solid #3d7a5c; border-radius:10px; padding:12px 14px;">
-        <div class="keep-size" style="font-size:10pt; color:var(--ink-soft); margin-bottom:6px;">사주풀이·운세·궁합·실시간 Q&amp;A에 함께 반영돼요 · 빈 곳을 누르면 접혀요</div>
-        <div class="voice-input-wrap">
-          <textarea id="ctxShared" rows="4" placeholder="예: 이직을 고민 중이다, 최근 다투는 일이 많다 등" style="width:100%; font-family:inherit; font-size:14pt; padding:9px 10px; border:1px solid var(--rule); border-radius:8px; background:#fffdf7; resize:vertical; min-height:96px; max-height:40vh; overflow-y:auto;"></textarea>
-          <button type="button" class="mic-btn" id="micCtxShared" title="음성으로 입력">🎤</button>
-        </div>
-        <div class="mic-err" id="micErrCtxShared"></div>
-      </div>
+      <button type="button" id="btnCtx" class="go-btn" title="현재 상황 입력 — 사주풀이·운세·궁합·Q&A에 함께 반영돼요" style="width:auto; padding:5px 6px; font-size:10.5px; font-weight:600; background:#fffdf7; color:var(--ink); border-color:var(--rule); display:inline-block; white-space:nowrap;">현재상황</button>
     </div>
 
     <div id="relList" style="display:none;"></div>
@@ -514,6 +503,19 @@
       <div class="panel reading-panel" id="panel-hidden"></div>
       <div class="panel reading-panel" id="panel-tengod"></div>
       <div class="panel reading-panel" id="panel-ilgan"></div>
+      <div class="panel reading-panel" id="panel-ctx">
+        <h4>현재 상황</h4>
+        <p style="color:var(--ink-soft);">사주풀이·운세·궁합·택일·실시간 Q&amp;A에 함께 반영돼요. 내용을 적어 두면 화면의 "현재상황" 버튼이 초록색으로 바뀝니다.</p>
+        <div class="voice-input-wrap">
+          <textarea id="ctxShared" rows="5" placeholder="예: 이직을 고민 중이다, 최근 다투는 일이 많다 등" style="width:100%; font-family:inherit; font-size:14pt; padding:9px 10px; border:1px solid var(--rule); border-radius:8px; background:#fffdf7; box-sizing:border-box;"></textarea>
+          <button type="button" class="mic-btn" id="micCtxShared" title="음성으로 입력">🎤</button>
+        </div>
+        <div class="mic-err" id="micErrCtxShared"></div>
+        <div style="display:flex; gap:8px; margin-top:12px; flex-wrap:wrap;">
+          <button type="button" class="go-btn" id="btnCtxDone" style="width:auto; padding:9px 18px;">확인</button>
+          <button type="button" class="go-btn" id="btnCtxClear" style="width:auto; padding:9px 18px; background:#fffdf7; color:var(--ink); border-color:var(--rule);">지우기</button>
+        </div>
+      </div>
       <div class="panel reading-panel" id="panel-stage"></div>
     </div>
   </div>
@@ -1579,7 +1581,7 @@ window.__pip = (function(){
     }).join('');
     document.getElementById('panel-hidden').innerHTML = `
       <h4>지장간 (支藏干) — ${BRANCH_HANJA[branchIdx]}(${BRANCHES[branchIdx]})</h4>
-      <p>지지 하나에는 겉으로 드러난 오행 외에, 그 속에 여러 천간의 기운이 함께 숨어 있다고 봅니다. 이를 지장간이라 하며, 시간의 흐름에 따라 세력이 옮겨가는 <b>여기(초기)</b>·<b>중기</b>·<b>정기(본기)</b>로 나뉩니다. 이 중 정기가 그 지지를 대표하는 가장 강한 기운이며, 사주 해석 시 통근(通根) 여부를 판단하는 기준이 되기도 합니다.</p>
+      <p>지지 하나에는 겉으로 드러난 오행 외에, 그 속에 여러 천간의 기운이 함께 숨어 있다고 봅니다. 이를 지장간이라 하며, 시간의 흐름에 따라 세력이 옮겨가는 <b>여기(초기)</b>·<b>중기</b>·<b>정기(본기)</b>로 나뉩니다. 이 중 정기가 그 지지를 대표하는 가장 강한 기운이며, 사주 해석 시 통근(通根) 여부를 판단하는 기준이 되기도 합니다. 원국의 "통근" 표시에서 <b>정</b>은 정기, <b>중</b>은 중기, <b>여</b>는 여기에 뿌리를 둔 것이고 <b>◎</b>는 음양까지 같은 글자에 뿌리를 둔 경우입니다. 정기의 뿌리가 가장 튼튼하고 여기만 있으면 "약한 통근"으로 봅니다.</p>
       ${rows}
     `;
   }
@@ -1713,7 +1715,13 @@ window.__pip = (function(){
     const gwiinMap=detectGwiinBranches(s);
     const tt=analyzeTonggeunTuchul(s);
     const tonggeunByLabel={};
-    tt.tonggeun.forEach(st=>{ tonggeunByLabel[st.label] = st.roots.length ? `통근(${st.roots.map(r=>r.branchLabel.replace(/지$/,'')).join('·')})` : null; });
+    const PHASE_SHORT={'정기':'정','중기':'중','여기':'여'};
+    tt.tonggeun.forEach(st=>{
+      if(!st.roots.length){ tonggeunByLabel[st.label]=null; return; }
+      const list=st.roots.map(r=>r.branchLabel.replace(/지$/,'')+PHASE_SHORT[r.phase]+(r.exact?'◎':'')).join('·');
+      const weak=st.roots.every(r=>r.phase==='여기'); // 여기에만 뿌리가 있으면 약한 통근
+      tonggeunByLabel[st.label]=`${weak?'약한 통근':'통근'}(${list})`;
+    });
     const mkExtra=(branch, stemLabel)=>({ isGongmang: gongmang.includes(branch), sinsal: sinsalMap[branch], gwiin: gwiinMap[branch], tonggeun: stemLabel?tonggeunByLabel[stemLabel]:null });
     let html='';
     extra.forEach(c=>{ html+=pillarHTML(c.tag, c.part, dayStemIdx, false, true, 'extra-col'); });
@@ -1814,7 +1822,7 @@ window.__pip = (function(){
     const gongmangHtml = extra && extra.isGongmang ? `<div class="gongmang-badge" style="margin-top:-4px;color:var(--seal);font-size:10.5px;">空亡</div>` : '';
     const sinsalHtml = extra && extra.sinsal ? `<div class="sinsal12-tag" style="margin-top:2px;font-size:11px;color:var(--ink-soft);">${extra.sinsal}</div>` : '';
     const gwiinHtml = extra && extra.gwiin && extra.gwiin.length ? `<div class="gwiin-tag" style="margin-top:2px;font-size:10.5px;color:var(--gold);">${extra.gwiin.join('·')}</div>` : '';
-    const tonggeunHtml = extra && extra.tonggeun ? `<div class="tonggeun-tag" style="font-size:10px;color:var(--ink-soft);margin-top:-2px;">${extra.tonggeun}</div>` : '';
+    const tonggeunHtml = extra && extra.tonggeun ? `<div class="tonggeun-tag" title="정=정기(가장 튼튼) · 중=중기 · 여=여기(가장 약함) · ◎=음양까지 같은 글자에 뿌리. 여기에만 뿌리가 있으면 약한 통근" style="font-size:10px;color:var(--ink-soft);margin-top:-2px;">${extra.tonggeun}</div>` : '';
     return `<div class="pillar${extraClass?' '+extraClass:''}">
         <div class="tag">${tag}</div>
         ${stemTGHtml}
@@ -2026,7 +2034,7 @@ window.__pip = (function(){
 
 [전체를 하나로 보기] 원국·격국·용신·통근·형충회합·대운·세운을 서로 무관한 개별 사실들의 나열로 다루지 마. 이 모든 요소는 서로 얽혀서 하나의 그물처럼 작용해. 예를 들어 원국만으로는 안 보이던 관계(삼합·삼형 등)가 대운이나 세운이 들어와야 완성되는 경우가 있고, 격국을 지탱하는 글자가 대운에 의해 강해지거나 흔들리기도 해. 위에 주어진 데이터 중 서로 연결해서 볼 수 있는 것들을 적극적으로 엮어서 설명해줘 — 하나만 따로 떼어 설명하는 것보다 훨씬 정확하고 설득력 있는 풀이가 돼.
 
-검증 순서: 조후(계절의 한난조습에 원국이 맞는지, 보완할 글자가 있는지) → 억부(위에 주어진 신강/신약과 용신·희신·기신·구신) → 통관(서로 부딪히는 오행 사이를 이어주는 글자가 있는지, 그 글자가 주변 기운에 말라있거나 힘이 있는지) → 병약(과다하거나 병이 되는 오행을 다스리는 글자가 약으로 존재하는지) 순서로 원국의 짜임을 먼저 진단해줘. 위에 주어진 격국은 기계적으로 간략화한 참고용 판정이니 그대로 믿지 말고, 함께 주어진 통근·투출·형충회합·용신 정보를 종합해서 그 격이 실제로 얼마나 튼튼한지 스스로 판단해줘. 격을 정한 글자가 통근(지장간에 뿌리)이 있으면 힘 있는 격으로, 뿌리 없이 천간에만 떠 있으면 약한 격으로 봐줘. "파격 가능성"이 적혀 있으면, 그 관계가 합인지 충인지와 주변 글자들을 근거로 "완전히 깨졌다 / 흔들리는 정도다 / 오히려 좋아졌다" 중 어디에 가까운지 네 판단을 밝혀줘. "외격 가능성"이 적혀 있으면, 인성·비겁의 유무를 근거로 실제 종격에 가까운지 아니면 억부법을 그대로 적용해도 되는지 판단해줘.
+검증 순서: 조후(계절의 한난조습에 원국이 맞는지, 보완할 글자가 있는지) → 억부(위에 주어진 신강/신약과 용신·희신·기신·구신) → 통관(서로 부딪히는 오행 사이를 이어주는 글자가 있는지, 그 글자가 주변 기운에 말라있거나 힘이 있는지) → 병약(과다하거나 병이 되는 오행을 다스리는 글자가 약으로 존재하는지) 순서로 원국의 짜임을 먼저 진단해줘. 위에 주어진 격국은 기계적으로 간략화한 참고용 판정이니 그대로 믿지 말고, 함께 주어진 통근·투출·형충회합·용신 정보를 종합해서 그 격이 실제로 얼마나 튼튼한지 스스로 판단해줘. 격을 정한 글자가 통근(지장간에 뿌리)이 있으면 힘 있는 격으로 보되, 정기에 뿌리를 둔 통근이 가장 튼튼하고 여기에만 뿌리가 있으면 약한 통근으로 구분해서 봐줘. 뿌리 없이 천간에만 떠 있으면 약한 격으로 봐줘. "파격 가능성"이 적혀 있으면, 그 관계가 합인지 충인지와 주변 글자들을 근거로 "완전히 깨졌다 / 흔들리는 정도다 / 오히려 좋아졌다" 중 어디에 가까운지 네 판단을 밝혀줘. "외격 가능성"이 적혀 있으면, 인성·비겁의 유무를 근거로 실제 종격에 가까운지 아니면 억부법을 그대로 적용해도 되는지 판단해줘.
 
 이 진단이 끝난 뒤, 십신을 언급할 때는 이름과 개수만 나열하지 말고 반드시 그 십신을 이루는 글자가 형충회합으로 깨져 있는지, 대운·세운의 계절(오행)과 상생하는지 상극하는지, 통근해서 뿌리가 있는지를 먼저 확인하고, "이 십신은 이름은 있지만 형충으로 깨지거나 기신에 둘러싸여 왜곡되어 있다" 또는 "이 십신은 통근하고 계절과도 맞아 온전히 힘을 쓴다"는 식으로 그 십신이 실제로 살아서 작용하는지 왜곡되어 있는지를 판단해서 서술해줘. 이런 판단은 막연한 추측이 아니라, 위에 주어진 구체적 데이터(통근·형충회합·오행 개수·용신)를 근거로 논리적으로 설명해줘.
 
@@ -2138,7 +2146,7 @@ window.__pip = (function(){
     const tt=analyzeTonggeunTuchul(s);
     const tonggeunLines=tt.tonggeun.map(st=>{
       if(!st.roots.length) return `${st.label}(${STEM_HANJA[st.idx]}): 통근 없음`;
-      const rootDesc=st.roots.map(r=>`${r.branchLabel}${r.exact?'(정확히 같은 글자)':''}[${r.phase}]`).join(', ');
+      const rootDesc=st.roots.map(r=>`${r.branchLabel}${r.exact?'(정확히 같은 글자)':''}[${r.phase}]`).join(', ') + (st.roots.every(r=>r.phase==='여기') ? ' → 여기에만 뿌리가 있어 약한 통근' : '');
       return `${st.label}(${STEM_HANJA[st.idx]}): 통근 있음 — ${rootDesc}`;
     });
     lines.push('통근(通根, 천간이 지지 지장간에 뿌리내렸는지):\n' + tonggeunLines.map(l=>'  · '+l).join('\n'));
@@ -3077,7 +3085,7 @@ window.__pip = (function(){
   const PANEL_LABELS={
     'panel-reading':'사주풀이','panel-compat':'궁합','panel-fortune':'운세',
     'panel-wedding':'결혼택일','panel-moving':'이사택일','panel-prayer':'기도택일',
-    'panel-zodiac':'별자리','panel-qna':'실시간 Q&A','panel-daewoon':'대운','panel-sewoon':'세운'
+    'panel-zodiac':'별자리','panel-qna':'실시간 Q&A','panel-daewoon':'대운','panel-sewoon':'세운','panel-ctx':'현재 상황'
   };
   function openModal(tab){
     const panelId='panel-'+tab;
@@ -3343,6 +3351,40 @@ window.__pip = (function(){
   }
   // 메인 페이지를 닫거나 새로고침하면 별도 창도 같이 닫는다
   window.addEventListener('pagehide', ()=>{ try{ if(pipWin) pipWin.close(); }catch(e){} });
+
+  // ---- 현재 상황: 버튼을 누르면 팝업이 열리고, 내용이 있으면 버튼이 초록색으로 바뀐다 ----
+  function ctxHas(){ const t=document.getElementById('ctxShared'); return !!(t && (t.value||'').trim()); }
+  function updateCtxBtn(){
+    const b=document.getElementById('btnCtx'); if(!b) return;
+    const has=ctxHas();
+    b.style.background = has ? '#3d7a5c' : '#fffdf7';
+    b.style.color = has ? '#ffffff' : 'var(--ink)';
+    b.style.borderColor = has ? '#2f6148' : 'var(--rule)';
+    b.title = has ? '현재 상황이 입력되어 있어요 — 눌러서 보기·고치기' : '현재 상황 입력 — 사주풀이·운세·궁합·Q&A에 함께 반영돼요';
+  }
+  function openCtxPopup(){
+    detailReturnPanelId=null;
+    document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
+    document.querySelectorAll('.reading-panel').forEach(p=>p.classList.remove('show'));
+    document.getElementById('panel-ctx').classList.add('show');
+    modalOverlay.classList.remove('fullscreen');
+    if(window.__resetModalPosition) window.__resetModalPosition();
+    modalOverlay.classList.add('open');
+    document.body.style.overflow='hidden';
+    const sc=modalOverlay.querySelector('.modal-scroll'); if(sc) sc.scrollTop=0;
+    const ta=document.getElementById('ctxShared');
+    if(ta){ autoGrow(ta); setTimeout(()=>{ try{ ta.focus(); }catch(e){} }, 50); }
+  }
+  (function(){
+    const ta=document.getElementById('ctxShared');
+    document.getElementById('btnCtx').addEventListener('click', openCtxPopup);
+    document.getElementById('btnCtxDone').addEventListener('click', ()=>{ updateCtxBtn(); closeModal(); });
+    document.getElementById('btnCtxClear').addEventListener('click', ()=>{ ta.value=''; autoGrow(ta); updateCtxBtn(); ta.focus(); });
+    ['input','change','blur'].forEach(ev=>ta.addEventListener(ev, updateCtxBtn));
+    // 음성 입력처럼 입력 이벤트 없이 값이 바뀌는 경우를 위해, 팝업이 열리고 닫힐 때도 색을 다시 맞춘다
+    new MutationObserver(updateCtxBtn).observe(modalOverlay,{attributes:true,attributeFilter:['class']});
+    updateCtxBtn();
+  })();
 
   // ---- 소스 보기 ----
   // ---- 저장된 사주 목록 ----
@@ -4159,11 +4201,11 @@ window.__pip = (function(){
   const GEONJE_NAMES=['건','제','만','평','정','집','파','위','성','수','개','폐'];
   const GEONJE_HANJA={건:'建',제:'除',만:'滿',평:'平',정:'定',집:'執',파:'破',위:'危',성:'成',수:'收',개:'開',폐:'閉'};
   const GEONJE_GOOD_MOVING=['성','개','정','평'];
-  const DAEJANGGUN_GROUPS=[{branches:[11,0,1],dir:'동(東)'},{branches:[2,3,4],dir:'북(北)'},{branches:[5,6,7],dir:'서(西)'},{branches:[8,9,10],dir:'남(南)'}];
+  const DAEJANGGUN_GROUPS=[{branches:[11,0,1],dir:'서(西)'},{branches:[2,3,4],dir:'북(北)'},{branches:[5,6,7],dir:'동(東)'},{branches:[8,9,10],dir:'남(南)'}];
   const SAMSAL_GROUPS=[{branches:[2,6,10],dir:'북(北)'},{branches:[5,9,1],dir:'동(東)'},{branches:[8,0,4],dir:'남(南)'},{branches:[11,3,7],dir:'서(西)'}];
   function dirForYearBranch(groups,branch){ const g=groups.find(g=>g.branches.includes(branch)); return g?g.dir:''; }
   function monthBranchForDate(y,m,day){
-    const jdUT=toJD(y,m,day,12-9), lon=sunLongitude(jdUT), adj=mod(lon-315,360), termIndex=Math.min(11,Math.floor(adj/30));
+    const jdUT=toJD(y,m,day,15-1/60), lon=sunLongitude(jdUT), adj=mod(lon-315,360), termIndex=Math.min(11,Math.floor(adj/30)); // 한국시간 23:59 — 절입이 든 날은 새 달로 본다
     const monthBranchOrder=[2,3,4,5,6,7,8,9,10,11,0,1];
     return monthBranchOrder[termIndex];
   }
@@ -4195,7 +4237,7 @@ window.__pip = (function(){
       title='이사택일';
       const td=new Date(), tyB=yearBranchForDate(td.getFullYear(), td.getMonth()+1, td.getDate());
       const djDir=dirForYearBranch(DAEJANGGUN_GROUPS,tyB), ssDir=dirForYearBranch(SAMSAL_GROUPS,tyB);
-      desc = `"손 없는 날"·황도길일(건제십이신 중 성·개·정·평일)·본인 사주의 용신/희신에 맞는 날을 함께 보고, 겹치는 조건이 많은 날부터 보여드립니다. 유파에 따라 세부 기준이 다를 수 있는 참고용 결과입니다. 참고로 올해(${BRANCH_HANJA[tyB]}년)는 대장군 방위가 ${djDir}쪽, 삼살방이 ${ssDir}쪽이라고 전해지니, 그 방향으로 이사하거나 그쪽 방향의 집을 수리·공사하는 것은 전통적으로 피하는 게 좋다고 합니다.`;
+      desc = `"손 없는 날"·건제길일(건제십이신 중 성·개·정·평일)·본인 사주의 용신/희신에 맞는 날을 함께 보고, 겹치는 조건이 많은 날부터 보여드립니다. 유파에 따라 세부 기준이 다를 수 있는 참고용 결과입니다. 참고로 올해(${BRANCH_HANJA[tyB]}년)는 대장군 방위가 ${djDir}쪽, 삼살방이 ${ssDir}쪽이라고 전해지니, 그 방향으로 이사하거나 그쪽 방향의 집을 수리·공사하는 것은 전통적으로 피하는 게 좋다고 합니다.`;
       filterFn=(info)=>{
         const reasons=[]; let score=0;
         const ld=info.lunar.day;
@@ -4210,7 +4252,7 @@ window.__pip = (function(){
         if(reasons.length===0) return null;
         const shortTags=[];
         if(ld%10===9||ld%10===0) shortTags.push('손없는날');
-        if(GEONJE_GOOD_MOVING.includes(gName)) shortTags.push(`황도길일(${gName}일)`);
+        if(GEONJE_GOOD_MOVING.includes(gName)) shortTags.push(`건제길일(${gName}일)`);
         if(ys && STEM_ELEM[info.dStem]===ys.yong) shortTags.push('용신길일');
         else if(ys && STEM_ELEM[info.dStem]===ys.hui) shortTags.push('희신길일');
         return {tag: shortTags.join(' · '), score, reasons};
@@ -4328,7 +4370,7 @@ window.__pip = (function(){
     const panel=document.getElementById('panel-wedding');
     panel.innerHTML = `
       <h4>결혼택일</h4>
-      <p>내 일지와 육합·삼합이 되는 날은 선호하고, 충·해(六害)·원진·형(자형·상형)·고신/과숙에 걸리는 날은 후보에서 제외하면서, 손 없는 날·황도길일(건제법)·월덕일(月德日)·용신/희신에 맞는 날까지 점수로 매겨 좋은 날부터 보여드립니다. 천덕일·음양부장길일·가취월(혼인기피월)은 정확한 원전 표를 확인하지 못해 이번엔 반영하지 않았습니다. 전통 택일법은 유파마다 세부 기준이 달라 참고용으로만 봐주세요.</p>
+      <p>내 일지와 육합·삼합이 되는 날은 선호하고, 충·해(六害)·원진·형(자형·상형)·고신/과숙에 걸리는 날은 후보에서 제외하면서, 손 없는 날·건제길일(건제법)·월덕일(月德日)·용신/희신에 맞는 날까지 점수로 매겨 좋은 날부터 보여드립니다. 천덕일·음양부장길일·가취월(혼인기피월)은 정확한 원전 표를 확인하지 못해 이번엔 반영하지 않았습니다. 전통 택일법은 유파마다 세부 기준이 달라 참고용으로만 봐주세요.</p>
       <div class="mini-form">
         <div class="field" style="flex:0 0 220px;">
           <label style="font-size:11px;color:var(--ink-soft);">기준</label>
