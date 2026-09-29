@@ -199,6 +199,18 @@
     cursor:pointer; color:var(--ink-soft); z-index:10;
   }
   .modal-minimize:hover{ background:var(--gold); color:#fff; border-color:var(--gold); }
+  .modal-maximize{
+    position:absolute; top:14px; right:98px; width:34px; height:34px; border-radius:50%;
+    border:1px solid var(--rule); background:#fffdf7; font-size:16px; line-height:1;
+    cursor:pointer; color:var(--ink-soft); z-index:10;
+  }
+  .modal-maximize:hover{ background:var(--seal); color:#fff; border-color:var(--seal); }
+  .modal-drag-handle{
+    position:absolute; top:0; left:0; right:0; height:44px; cursor:move; z-index:5;
+  }
+  .modal-box.dragging-enabled{ position:fixed; margin:0; transition:none; }
+  .modal-box.maximized{ width:96vw !important; max-width:none !important; height:96vh !important; top:2vh !important; left:2vw !important; }
+  .modal-box.maximized .modal-scroll{ max-height:calc(96vh - 80px) !important; }
   .minimized-taskbar{
     position:fixed; left:0; right:0; bottom:0; z-index:1200; display:none;
     background:var(--paper); border-top:1px solid var(--rule); padding:8px 12px;
@@ -332,6 +344,8 @@
   <div id="result">
     <div class="result-head"><h2 id="resultTitle">사주원국</h2><span id="resultMeta"></span></div>
 
+    <div class="note keep-size" id="introNote" style="margin-top:6px; margin-bottom:14px; font-size:10pt;"></div>
+
     <div class="tabs" id="tabs">
       <button type="button" class="tab-btn" data-tab="reading">사주풀이</button>
       <button type="button" class="tab-btn" data-tab="compat">궁합</button>
@@ -342,9 +356,8 @@
       <button type="button" class="tab-btn" data-tab="zodiac">별자리</button>
       <button type="button" class="tab-btn" data-tab="qna">실시간 Q&amp;A</button>
     </div>
-    <div class="note keep-size" id="introNote" style="margin-top:14px; margin-bottom:22px; font-size:10pt;"></div>
 
-    <div style="display:flex; justify-content:flex-end; gap:6px; margin-bottom:8px; flex-wrap:wrap;">
+    <div style="display:flex; justify-content:flex-end; gap:6px; margin-top:10px; margin-bottom:8px; flex-wrap:wrap;">
       <div style="display:flex; border:1px solid var(--rule); border-radius:8px; overflow:hidden;">
         <button type="button" id="btnToggleRel" style="padding:6px 8px; font-size:11px; background:#fffdf7; color:var(--ink); border:none; cursor:pointer; white-space:nowrap;">형충회합보기</button>
       </div>
@@ -358,35 +371,6 @@
       </div>
       <button type="button" id="btnShowInputCard" class="go-btn" style="width:auto; padding:6px 8px; font-size:11px; background:#fffdf7; color:var(--ink); border-color:var(--rule); display:none; white-space:nowrap;">✎다시입력</button>
       <button type="button" id="btnEditToggle" class="go-btn" style="width:auto; padding:6px 8px; font-size:11px; background:#fffdf7; color:var(--ink); border-color:var(--rule); display:inline-block; white-space:nowrap;">✎수동수정</button>
-    </div>
-
-    <div id="relList" style="display:none;"></div>
-
-    <div id="dwBody" style="display:none;">
-      <div class="dw-meta" id="dwMeta"></div>
-      <div id="dwList"></div>
-      <div class="dw-legend">길흉: <span class="gy-good">●용신/희신운</span> · <span class="gy-mid">●평운</span> · <span class="gy-bad">●기신/구신운</span></div>
-    </div>
-
-    <div id="swBody" style="display:none;">
-      <div id="swList"></div>
-    </div>
-
-    <div id="pillarsWrap" style="position:relative;">
-      <svg id="relSvgTop" style="display:block;width:100%;pointer-events:none;" height="1"></svg>
-      <div class="pillars" id="pillars"></div>
-      <svg id="relSvgBottom" style="display:block;width:100%;pointer-events:none;" height="1"></svg>
-    </div>
-    <div id="editControls" style="display:none; gap:8px; margin:-10px 0 22px;">
-      <button type="button" id="btnEditApply" class="go-btn" style="flex:1; background:#3d7a5c; border-color:#3d7a5c;">적용하기</button>
-      <button type="button" id="btnEditCancel" class="go-btn" style="flex:0 0 auto; background:#fffdf7; color:var(--ink); border-color:var(--rule);">취소</button>
-    </div>
-
-    <div class="balance">
-      <h3>오행 분포</h3>
-      <div class="bar" id="bar"></div>
-      <div class="legend" id="legend"></div>
-      <div class="yongsin-box" id="ysBox" style="margin-top:10px;padding-top:10px;border-top:1px dashed var(--rule);"></div>
     </div>
 
     <div class="fold-card" style="margin-bottom:12px;">
@@ -404,6 +388,52 @@
         <div class="mic-err" id="micErrCtxShared"></div>
       </div>
     </div>
+
+    <div id="relList" style="display:none;"></div>
+
+    <div id="dwBody" style="display:none;">
+      <div class="dw-meta" id="dwMeta"></div>
+      <div id="dwList"></div>
+      <div class="dw-legend">길흉: <span class="gy-good">●용신/희신운</span> · <span class="gy-mid">●평운</span> · <span class="gy-bad">●기신/구신운</span></div>
+    </div>
+
+    <div id="swBody" style="display:none;">
+      <div id="swList"></div>
+    </div>
+
+    <div id="editModeSwitch" style="display:none; gap:6px; margin:10px 0 10px;">
+      <button type="button" id="btnEditModeGanji" style="padding:6px 10px; font-size:11px; border-radius:8px; border:1px solid var(--rule); background:var(--seal); color:#fff; cursor:pointer;">간지로 수정</button>
+      <button type="button" id="btnEditModeDate" style="padding:6px 10px; font-size:11px; border-radius:8px; border:1px solid var(--rule); background:#fffdf7; color:var(--ink); cursor:pointer;">생년월일시로 수정</button>
+    </div>
+    <div id="editByDate" style="display:none; margin-bottom:14px;">
+      <div class="row">
+        <div class="field"><label class="keep-size" style="font-size:12pt;">년</label><select id="editYear"></select></div>
+        <div class="field"><label class="keep-size" style="font-size:12pt;">월</label><select id="editMonth"></select></div>
+        <div class="field"><label class="keep-size" style="font-size:12pt;">일</label><select id="editDay"></select></div>
+      </div>
+      <div class="row">
+        <div class="field"><label class="keep-size" style="font-size:12pt;">시</label><select id="editHour"></select></div>
+        <div class="field"><label class="keep-size" style="font-size:12pt;">분</label><select id="editMinute"></select></div>
+      </div>
+      <p class="note keep-size" style="font-size:10pt;">양력 기준으로 다시 계산합니다. 성별·진태양시 보정·출생지는 기존 설정을 그대로 씁니다.</p>
+    </div>
+    <div id="pillarsWrap" style="position:relative;">
+      <svg id="relSvgTop" style="display:block;width:100%;pointer-events:none;" height="1"></svg>
+      <div class="pillars" id="pillars"></div>
+      <svg id="relSvgBottom" style="display:block;width:100%;pointer-events:none;" height="1"></svg>
+    </div>
+    <div id="editControls" style="display:none; gap:6px; margin:10px 0 22px;">
+      <button type="button" id="btnEditApply" class="go-btn" style="width:auto; padding:7px 16px; font-size:12.5px; background:#3d7a5c; border-color:#3d7a5c;">적용하기</button>
+      <button type="button" id="btnEditCancel" class="go-btn" style="width:auto; padding:7px 16px; font-size:12.5px; background:#fffdf7; color:var(--ink); border-color:var(--rule);">취소</button>
+    </div>
+
+    <div class="balance">
+      <h3>오행 분포</h3>
+      <div class="bar" id="bar"></div>
+      <div class="legend" id="legend"></div>
+      <div class="yongsin-box" id="ysBox" style="margin-top:10px;padding-top:10px;border-top:1px dashed var(--rule);"></div>
+    </div>
+
     <div class="fold-card" style="margin-bottom:28px;">
       <div class="fold-head" style="display:flex; align-items:center; gap:10px; cursor:pointer; min-width:0; padding:13px; background:#2b3a67; color:#ffffff; border:1px solid #202c50; border-radius:8px; font-weight:700; letter-spacing:0.04em;">
         <span class="fold-caret" style="flex:none; font-size:14pt;">▸</span>
@@ -454,7 +484,9 @@
 </div>
 
 <div class="modal-overlay" id="modalOverlay">
-  <div class="modal-box">
+  <div class="modal-box" id="modalBox">
+    <div class="modal-drag-handle" id="modalDragHandle" title="끌어서 이동"></div>
+    <button type="button" class="modal-maximize" id="modalMaximize" aria-label="화면 채우기" title="화면 채우기">⛶</button>
     <button type="button" class="modal-minimize" id="modalMinimize" aria-label="최소화" title="최소화">－</button>
     <button type="button" class="modal-close" id="modalClose" aria-label="닫기">×</button>
     <div class="modal-scroll">
@@ -2617,10 +2649,26 @@
     if(btn) btn.style.display='inline-block';
   }
   function showInputCard(){
+    clearInputCard();
     const card=document.getElementById('inputCard'), btn=document.getElementById('btnShowInputCard');
     if(card) card.style.display='';
     if(btn) btn.style.display='none';
     if(card) card.scrollIntoView({behavior:'smooth', block:'start'});
+  }
+  // "다시 입력" 시, 이전에 계산했던 사람의 정보가 남아있지 않도록 입력 칸을 전부 기본값으로 되돌린다.
+  function clearInputCard(){
+    document.getElementById('inputName').value='';
+    isMale=true; btnMale.classList.add('active'); btnFemale.classList.remove('active');
+    calType='solar'; btnSolar.classList.add('active'); btnLunar.classList.remove('active');
+    isLeapMonth=false; updateLeapBtnStyle();
+    noteText.textContent='양력 기준으로 계산합니다. 실제 출생지의 진태양시(경도 보정)는 적용하지 않으며, 한국 표준시(UTC+9) 기준입니다.';
+    selYear.value='2000'; selMonth.value='1'; fillDays(); selDay.value='1';
+    selHour.value='12'; selMinute.value='0';
+    document.getElementById('chkUnknown').checked=false;
+    document.getElementById('chkTrueSolar').checked=true;
+    document.getElementById('selLocation').value='127.5';
+    buildShiOptions(); document.getElementById('selShi').value='';
+    errorBox.textContent=''; errorBox.classList.remove('show');
   }
   document.getElementById('btnShowInputCard').addEventListener('click', showInputCard);
   // "대운보기"/"세운보기": 지금 나이 기준 대운·올해 세운을, 대운/세운 표에서 그 행을 클릭한 것과 똑같이
@@ -2703,25 +2751,18 @@
     document.getElementById('resultTitle').textContent = name ? `${name}님의 사주원국` : '사주원국';
     document.getElementById('resultMeta').textContent='';
     (function(){
-      const smallBits=[];
-      smallBits.push(hasTime? (shiLabel? shiLabel : String(hour).padStart(2,'0')+':'+String(minute).padStart(2,'0')) : '시간 미상');
-      smallBits.push(im?'남자':'여자');
-      if(convertedNote) smallBits.push(convertedNote.trim());
-      if(hasTime) smallBits.push(applyTrueSolar?`진태양시 보정 적용${longitude&&longitude!==127.5?`(경도 ${longitude}°)`:''}`:'보정 미적용(시계 시각 그대로)');
-      if(edited) smallBits.push('✎ 직접 수정됨');
-
+      const bits=[];
       const lun = solarToLunar(year, month, day);
-      let row1 = `양력 ${year}.${String(month).padStart(2,'0')}.${String(day).padStart(2,'0')}`;
-      let row2 = lun ? `음력 ${year}.${String(lun.month).padStart(2,'0')}.${String(lun.day).padStart(2,'0')}${lun.isLeap?'(윤)':''}` : '음력 -';
-      if(s.birthJD_UT!==undefined){
-        const terms=findNearbySolarTerms(s.birthJD_UT);
-        const fmt=t=>`${t.m}월${t.day}일`;
-        row1 += `&nbsp;&nbsp;&nbsp;${terms.prev.name} ${fmt(terms.prev)}`;
-        row2 += `&nbsp;&nbsp;&nbsp;${terms.next.name} ${fmt(terms.next)}`;
-      }
+      let part1 = `양력 ${year}.${String(month).padStart(2,'0')}.${String(day).padStart(2,'0')}`;
+      let part2 = lun ? `음력 ${year}.${String(lun.month).padStart(2,'0')}.${String(lun.day).padStart(2,'0')}${lun.isLeap?'(윤)':''}` : '음력 -';
+      bits.push(part1, part2);
+      bits.push(hasTime? (shiLabel? shiLabel : String(hour).padStart(2,'0')+':'+String(minute).padStart(2,'0')) : '시간 미상');
+      bits.push(im?'남자':'여자');
+      if(convertedNote) bits.push(convertedNote.trim());
+      if(hasTime) bits.push(applyTrueSolar?`진태양시 보정 적용${longitude&&longitude!==127.5?`(경도 ${longitude}°)`:''}`:'보정 미적용(시계 시각 그대로)');
+      if(edited) bits.push('✎ 직접 수정됨');
       const el=document.getElementById('introNote');
-      if(el) el.innerHTML = `<div style="font-size:13px;line-height:1.7;color:var(--ink);"><div>${row1}</div><div>${row2}</div></div>`+
-        `<div style="font-size:11px;color:var(--ink-soft);margin-top:4px;">${smallBits.join(' · ')}</div>`;
+      if(el) el.textContent = bits.join(' · ');
     })();
 
     // 신강/신약 + 용신 (위치별 가중치 + 통근 반영)
@@ -2798,6 +2839,36 @@
     if(!state) return;
     renderPillarsRow();
   }
+  let editMode='ganji';
+  const editYear=document.getElementById('editYear'), editMonth=document.getElementById('editMonth'), editDay=document.getElementById('editDay');
+  const editHour=document.getElementById('editHour'), editMinute=document.getElementById('editMinute');
+  for(let y=thisYear+1;y>=1930;y--){ const o=document.createElement('option'); o.value=y; o.textContent=y+'년'; editYear.appendChild(o); }
+  for(let m=1;m<=12;m++){ const o=document.createElement('option'); o.value=m; o.textContent=m+'월'; editMonth.appendChild(o); }
+  for(let h=0;h<24;h++){ const o=document.createElement('option'); o.value=h; o.textContent=String(h).padStart(2,'0')+'시'; editHour.appendChild(o); }
+  for(let mi=0;mi<60;mi++){ const o=document.createElement('option'); o.value=mi; o.textContent=String(mi).padStart(2,'0')+'분'; editMinute.appendChild(o); }
+  function fillEditDays(){
+    const cur=editDay.value; editDay.innerHTML='';
+    const y=+editYear.value, m=+editMonth.value, days=new Date(y,m,0).getDate();
+    for(let d=1;d<=days;d++){ const o=document.createElement('option'); o.value=d; o.textContent=d+'일'; editDay.appendChild(o); }
+    if(cur && +cur<=days) editDay.value=cur;
+  }
+  editYear.addEventListener('change',fillEditDays); editMonth.addEventListener('change',fillEditDays);
+  function setEditMode(mode){
+    editMode=mode;
+    const btnG=document.getElementById('btnEditModeGanji'), btnD=document.getElementById('btnEditModeDate');
+    const panelG=document.getElementById('pillars'), panelD=document.getElementById('editByDate');
+    if(mode==='ganji'){
+      btnG.style.background='var(--seal)'; btnG.style.color='#fff';
+      btnD.style.background='#fffdf7'; btnD.style.color='var(--ink)';
+      panelG.style.display=''; panelD.style.display='none';
+    } else {
+      btnD.style.background='var(--seal)'; btnD.style.color='#fff';
+      btnG.style.background='#fffdf7'; btnG.style.color='var(--ink)';
+      panelG.style.display='none'; panelD.style.display='block';
+    }
+  }
+  document.getElementById('btnEditModeGanji').addEventListener('click', ()=>setEditMode('ganji'));
+  document.getElementById('btnEditModeDate').addEventListener('click', ()=>setEditMode('date'));
   function enterEditMode(){
     if(!state) return;
     const s=state.s;
@@ -2809,12 +2880,19 @@
       editPillarHTML('년주 · 年柱', s.year, 'year');
     document.getElementById('relSvgTop').innerHTML=''; document.getElementById('relSvgTop').setAttribute('height','1');
     document.getElementById('relSvgBottom').innerHTML=''; document.getElementById('relSvgBottom').setAttribute('height','1');
+    editYear.value=state.year; editMonth.value=state.month; fillEditDays(); editDay.value=state.day;
+    editHour.value=state.hasTime?state.hour:12; editMinute.value=state.hasTime?state.minute:0;
+    document.getElementById('editModeSwitch').style.display='flex';
+    setEditMode('ganji');
     document.getElementById('editControls').style.display='flex';
     document.getElementById('btnEditToggle').style.display='none';
   }
   function exitEditMode(){
     const ec=document.getElementById('editControls'), bt=document.getElementById('btnEditToggle');
+    const ms=document.getElementById('editModeSwitch'), ed=document.getElementById('editByDate');
     if(ec) ec.style.display='none';
+    if(ms) ms.style.display='none';
+    if(ed) ed.style.display='none';
     if(bt) bt.style.display='inline-block';
     if(state) renderPillarsOnly();
   }
@@ -2825,24 +2903,40 @@
   document.getElementById('btnEditCancel').addEventListener('click', exitEditMode);
   document.getElementById('btnEditApply').addEventListener('click', ()=>{
     if(!state) return;
-    const newVals = {
-      year:{...state.s.year}, month:{...state.s.month}, day:{...state.s.day},
-      hour: state.s.hour ? {...state.s.hour} : null
-    };
-    document.querySelectorAll('#pillars select').forEach(sel=>{
-      const key=sel.dataset.key, part=sel.dataset.part;
-      if(newVals[key]) newVals[key][part] = +sel.value;
-    });
-    const newS = {
-      year:newVals.year, month:newVals.month, day:newVals.day, hour:newVals.hour,
-      termIndex: state.s.termIndex, birthJD_UT: state.s.birthJD_UT
-    };
-    renderAll(newS, {
-      year: state.year, month: state.month, day: state.day, hour: state.hour, minute: state.minute,
-      hasTime: state.hasTime, isMale: state.isMale, convertedNote: ' (수동 수정됨)',
-      applyTrueSolar: state.applyTrueSolar, longitude: state.longitude, edited: true, name: state.name, shiLabel: state.shiLabel
-    });
-    exitEditMode();
+    try{
+      if(editMode==='date'){
+        const ny=+editYear.value, nm=+editMonth.value, nd=+editDay.value, nh=+editHour.value, nmi=+editMinute.value;
+        const newS = computeSaju(ny, nm, nd, nh, nmi, state.hasTime, state.applyTrueSolar, state.longitude);
+        renderAll(newS, {
+          year:ny, month:nm, day:nd, hour:nh, minute:nmi,
+          hasTime: state.hasTime, isMale: state.isMale, convertedNote: ' (생년월일시 수정됨)',
+          applyTrueSolar: state.applyTrueSolar, longitude: state.longitude, edited: true, name: state.name, shiLabel: ''
+        });
+        exitEditMode();
+        return;
+      }
+      const newVals = {
+        year:{...state.s.year}, month:{...state.s.month}, day:{...state.s.day},
+        hour: state.s.hour ? {...state.s.hour} : null
+      };
+      document.querySelectorAll('#pillars select').forEach(sel=>{
+        const key=sel.dataset.key, part=sel.dataset.part;
+        if(newVals[key]) newVals[key][part] = +sel.value;
+      });
+      const newS = {
+        year:newVals.year, month:newVals.month, day:newVals.day, hour:newVals.hour,
+        termIndex: state.s.termIndex, birthJD_UT: state.s.birthJD_UT
+      };
+      renderAll(newS, {
+        year: state.year, month: state.month, day: state.day, hour: state.hour, minute: state.minute,
+        hasTime: state.hasTime, isMale: state.isMale, convertedNote: ' (수동 수정됨)',
+        applyTrueSolar: state.applyTrueSolar, longitude: state.longitude, edited: true, name: state.name, shiLabel: state.shiLabel
+      });
+      exitEditMode();
+    } catch(err){
+      alert('수동 수정을 적용하는 중 오류가 발생했습니다:\n' + err.message + '\n\n' + (err.stack||''));
+      console.error(err);
+    }
   });
 
   function renderTab(tab){
@@ -2865,6 +2959,39 @@
   const modalOverlay=document.getElementById('modalOverlay');
   const modalClose=document.getElementById('modalClose');
   const modalMinimize=document.getElementById('modalMinimize');
+  // ---- 팝업 끌어서 이동 + 화면 채우기 (PC 전용 편의 기능) ----
+  (function(){
+    const box=document.getElementById('modalBox'), handle=document.getElementById('modalDragHandle'), maxBtn=document.getElementById('modalMaximize');
+    let dragging=false, startX=0, startY=0, startLeft=0, startTop=0;
+    handle.addEventListener('mousedown', (e)=>{
+      if(box.classList.contains('maximized')) return; // 화면 채우기 상태에서는 이동 비활성
+      dragging=true;
+      const rect=box.getBoundingClientRect();
+      if(!box.classList.contains('dragging-enabled')){
+        box.classList.add('dragging-enabled');
+        box.style.left=rect.left+'px'; box.style.top=rect.top+'px';
+      }
+      startX=e.clientX; startY=e.clientY; startLeft=rect.left; startTop=rect.top;
+      e.preventDefault();
+    });
+    document.addEventListener('mousemove', (e)=>{
+      if(!dragging) return;
+      const dx=e.clientX-startX, dy=e.clientY-startY;
+      box.style.left=(startLeft+dx)+'px';
+      box.style.top=(startTop+dy)+'px';
+    });
+    document.addEventListener('mouseup', ()=>{ dragging=false; });
+    maxBtn.addEventListener('click', ()=>{
+      box.classList.toggle('maximized');
+      maxBtn.textContent = box.classList.contains('maximized') ? '⛶' : '⛶';
+      maxBtn.title = box.classList.contains('maximized') ? '원래 크기로' : '화면 채우기';
+    });
+    // 새 팝업이 열릴 때마다 이동/최대화 상태를 초기 위치로 되돌린다
+    window.__resetModalPosition = function(){
+      box.classList.remove('dragging-enabled','maximized');
+      box.style.left=''; box.style.top='';
+    };
+  })();
   let detailReturnPanelId=null; // 운세/궁합 등 안에서 십신·지장간·십이운성·일간 설명을 열었을 때, 닫기를 누르면 돌아갈 원래 패널
   let detailReturnScrollTop=0; // 그 패널을 보던 스크롤 위치
   let minimizedPanels=[]; // 최소화된 패널들: {panelId, label, scrollTop}
@@ -2877,6 +3004,7 @@
     const panelId='panel-'+tab;
     if(minimizedPanels.some(m=>m.panelId===panelId)){ restoreMinimized(panelId); return; }
     detailReturnPanelId=null;
+    if(window.__resetModalPosition) window.__resetModalPosition();
     document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
     document.querySelectorAll('.reading-panel').forEach(p=>p.classList.remove('show'));
     const btn=document.querySelector('.tab-btn[data-tab="'+tab+'"]');
@@ -2891,6 +3019,7 @@
   }
   function closeModal(){
     detailReturnPanelId=null;
+    if(window.__resetModalPosition) window.__resetModalPosition();
     modalOverlay.classList.remove('open');
     modalOverlay.classList.remove('fullscreen');
     document.body.style.overflow='';
