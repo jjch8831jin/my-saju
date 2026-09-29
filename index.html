@@ -559,6 +559,8 @@ window.__pip = (function(){
   const BRANCHES=['자','축','인','묘','진','사','오','미','신','유','술','해'];
   const BRANCH_HANJA=['子','丑','寅','卯','辰','巳','午','未','申','酉','戌','亥'];
   const BRANCH_ELEM=['수','토','목','목','토','화','화','토','금','금','토','수'];
+  // 지지의 음양(십신 계산용): 정기(본기) 천간의 음양을 따른다 — 子(癸)·午(丁)는 음, 巳(丙)·亥(壬)는 양 (체용 변화)
+  const BRANCH_YANG=[false,false,true,false,true,true,false,false,true,false,true,true];
   const ELEM_COLOR={목:'#3d7a5c',화:'#c1462f',토:'#c99a3b',금:'#8b8478',수:'#2b3a67'};
   const ELEM_ORDER=['목','화','토','금','수'];
   const GENERATES={목:'화',화:'토',토:'금',금:'수',수:'목'};
@@ -798,23 +800,29 @@ window.__pip = (function(){
     return {year,month,day};
   }
   const lunarMonthsCache={};
+  // 음력의 초하루(삭)와 중기는 '순간'이 아니라 한국 표준시의 '날짜'로 판정한다 (초하루=삭이 든 날, 중기=그 절기가 든 날)
+  function kstDayNum(jd){ return Math.floor(jd+9/24+0.5); } // JD(세계시) → 한국 날짜의 JDN
   function buildLunarMonths(cycleStartYear){
     if(lunarMonthsCache[cycleStartYear]) return lunarMonthsCache[cycleStartYear];
     const ws1=solarTermJD(270, toJD(cycleStartYear,12,22,0));
     const ws2=solarTermJD(270, toJD(cycleStartYear+1,12,22,0));
-    const m1=newMoonNear(ws1), m2=newMoonNear(ws2);
-    const nmList=[]; for(let k=m1.k;k<=m2.k;k++) nmList.push(newMoonJD(k));
-    const numIntervals=nmList.length-1, hasZ=[];
+    const wsDay1=kstDayNum(ws1), wsDay2=kstDayNum(ws2);
+    // 동지가 든 날짜를 포함하는 달(11월)의 삭 번호(k)를 날짜 기준으로 찾는다
+    const kFor=(seed,wsDay)=>{ let k=newMoonNear(seed).k; while(kstDayNum(newMoonJD(k))>wsDay) k--; while(kstDayNum(newMoonJD(k+1))<=wsDay) k++; return k; };
+    const k1=kFor(ws1,wsDay1), k2=kFor(ws2,wsDay2);
+    const nmList=[], nmDays=[];
+    for(let k=k1;k<=k2;k++){ const t=newMoonJD(k); nmList.push(t); nmDays.push(kstDayNum(t)); }
+    const numIntervals=nmDays.length-1, hasZ=[];
     for(let i=0;i<numIntervals;i++){
-      const start=nmList[i], end=nmList[i+1]; let found=false;
-      for(let z=0; z<12; z++){ const seed=(start+end)/2, t=solarTermJD(z*30, seed); if(t>=start && t<end){found=true;break;} }
+      const start=nmDays[i], end=nmDays[i+1], seed=(nmList[i]+nmList[i+1])/2; let found=false;
+      for(let z=0; z<12; z++){ const td=kstDayNum(solarTermJD(z*30, seed)); if(td>=start && td<end){found=true;break;} }
       hasZ.push(found);
     }
     const seq=[11,12,1,2,3,4,5,6,7,8,9,10]; const extra=numIntervals-12;
     let leapUsed=false, si=0; const months=[];
     for(let i=0;i<numIntervals;i++){
-      if(extra>0 && !leapUsed && i>0 && !hasZ[i]){ months.push({number:seq[si-1],isLeap:true,jd:nmList[i],jdEnd:nmList[i+1]}); leapUsed=true; }
-      else { months.push({number:seq[si],isLeap:false,jd:nmList[i],jdEnd:nmList[i+1]}); si++; }
+      if(extra>0 && !leapUsed && i>0 && !hasZ[i]){ months.push({number:seq[si-1],isLeap:true,jd:nmDays[i],jdEnd:nmDays[i+1]}); leapUsed=true; }
+      else { months.push({number:seq[si],isLeap:false,jd:nmDays[i],jdEnd:nmDays[i+1]}); si++; }
     }
     lunarMonthsCache[cycleStartYear]=months;
     return months;
@@ -824,19 +832,16 @@ window.__pip = (function(){
     const months=buildLunarMonths(cycleStartYear);
     const match=months.find(m=>m.number===month && m.isLeap===isLeap);
     if(!match) return {error:`${year}년에는 ${isLeap?'윤':''}${month}월이 없습니다.`};
-    const monthLen=Math.round(match.jdEnd-match.jd);
+    const monthLen=match.jdEnd-match.jd;
     if(day>monthLen) return {error:`이 달은 ${monthLen}일까지 있습니다.`};
-    const jdnBase=Math.floor(match.jd+9/24+0.5);
-    const base=jdnToGregorian(jdnBase);
-    const d=new Date(Date.UTC(base.year,base.month-1,base.day));
-    d.setUTCDate(d.getUTCDate()+(day-1));
-    return {year:d.getUTCFullYear(), month:d.getUTCMonth()+1, day:d.getUTCDate()};
+    const g=jdnToGregorian(match.jd+(day-1));
+    return {year:g.year, month:g.month, day:g.day};
   }
   function solarToLunar(y,m,d){
-    const jd = toJD(y,m,d, 12-9);
+    const jdn=gregorianToJDN(y,m,d);
     for(const csy of [y-1,y]){
       const months=buildLunarMonths(csy);
-      for(const mo of months){ if(jd>=mo.jd && jd<mo.jdEnd){ return {month:mo.number, isLeap:mo.isLeap, day:Math.round(jd-mo.jd)+1}; } }
+      for(const mo of months){ if(jdn>=mo.jd && jdn<mo.jdEnd){ return {month:mo.number, isLeap:mo.isLeap, day:jdn-mo.jd+1}; } }
     }
     return null;
   }
@@ -890,7 +895,9 @@ window.__pip = (function(){
   function computeSaju(year,month,day,hour,minute,hasTime,applyTrueSolar,longitude){
     if(applyTrueSolar===undefined) applyTrueSolar=true;
     if(longitude===undefined) longitude=127.5;
-    const hourUT = hour + minute/60 - 9;
+    // 시계 시각 → 세계시: 그 시대의 법정 표준시(1954.3.21~1961.8.9는 UTC+8:30, 서머타임 시행 기간은 +1시간)를 반영한다
+    const utcOffsetH = (historicalStdMeridian(year,month,day)===127.5 ? 8.5 : 9) + (isKoreanDST(year,month,day,hour,minute) ? 1 : 0);
+    const hourUT = hour + minute/60 - utcOffsetH;
     const birthJD_UT = toJD(year,month,day,hourUT);
     const ipchun = solarTermJD(315, toJD(year,2,4,0));
     let pillarYear = year;
@@ -928,6 +935,8 @@ window.__pip = (function(){
     return {year:{stem:yStem,branch:yBranch}, month:{stem:mStem,branch:mBranch}, day:{stem:dStem,branch:dBranch}, hour:hour_pillar, termIndex, birthJD_UT};
   }
 
+  // 나이가 대운 경계(예: 13세 = 앞 대운의 끝이자 다음 대운의 시작)에 걸리면 새로 시작하는 대운으로 본다
+  function dwIdxForAge(list, age){ for(let i=list.length-1;i>=0;i--){ if(age>=list[i].ageFrom && age<=list[i].ageTo) return i; } return -1; }
   function computeDaewoon(s, isMale, birthYear, birthMonth, birthDay){
     const yStemYang = s.year.stem%2===0, forward = (yStemYang === isMale), dir = forward ? 1 : -1;
     const currentLon = mod(315+30*s.termIndex,360), nextLon = mod(315+30*(s.termIndex+1),360);
@@ -1102,7 +1111,7 @@ window.__pip = (function(){
         if((tg!=='비견'&&tg!=='겁재') && stemsToCheck.includes(o.st)){ chosenStem=o.st; chosenTg=tg; note=`당령(${sajeongPhase})이 비겁이라, 대신 월지 ${phaseNames[o.i]}가 천간에 투출한 것을 격으로 삼음`; break; }
       }
       if(chosenStem===null){
-        return { gyeokName: (sajeongTg==='겁재'?'양인격':'건록격'), note:`월지 당령(${sajeongPhase})이 비겁(比劫)이라 별도 명명` };
+        return { gyeokName: (sajeongTg==='겁재' ? (dayStemIdx%2===0 ? '양인격' : '월겁격') : '건록격'), note:`월지 당령(${sajeongPhase})이 비겁(比劫)이라 별도 명명` };
       }
     }
     // 파격(破格) 가능성: 격을 정한 글자가 실제로 투출된 경우, 다른 천간과 합·충이 되는지 확인
@@ -1133,7 +1142,7 @@ window.__pip = (function(){
     return null;
   }
   // 납음오행(納音五行): 60갑자를 두 개씩 묶은 30개 조합마다 정해진 오행과 이름
-  const NAPEUM_NAME=['해중금','노중화','대림목','노방토','검봉금','산두화','간하수','성두토','백납금','양류목',
+  const NAPEUM_NAME=['해중금','노중화','대림목','노방토','검봉금','산두화','간하수','성두토','백랍금','양류목',
     '천중수','옥상토','벽력화','송백목','장류수','사중금','산하화','평지목','벽상토','금박금',
     '복등화','천하수','대역토','차천금','상자목','대계수','사중토','천상화','석류목','대해수'];
   const NAPEUM_ELEM=['금','화','목','토','금','화','수','토','금','목','수','토','화','목','수','금','화','목','토','금','화','수','토','금','목','수','토','화','목','수'];
@@ -1279,7 +1288,7 @@ window.__pip = (function(){
     SAMHAP_GROUPS.forEach(g=>{
       const matches=findLabels(g.set);
       if(matches.length===3) results.push({type:'삼합('+g.name+')', pair:matches.map(m=>m.label), elem:g.elem, charName:matches.map(m=>BRANCHES[m.idx]).join('')+'삼합', groupKey:g.name});
-      else if(matches.length===2) results.push({type:'반합('+g.name+')', pair:matches.map(m=>m.label), elem:g.elem, charName:matches.map(m=>BRANCHES[m.idx]).join('')+'반합', groupKey:g.name});
+      else if(matches.length===2 && matches.some(m=>m.idx===g.set[1])) results.push({type:'반합('+g.name+')', pair:matches.map(m=>m.label), elem:g.elem, charName:matches.map(m=>BRANCHES[m.idx]).join('')+'반합', groupKey:g.name});
     });
     return results;
   }
@@ -1527,7 +1536,7 @@ window.__pip = (function(){
     const {stemList, branchList} = buildFullStemBranchLists();
     let count=0;
     stemList.forEach(x=>{ if(tenGod(dayStemIdx, STEM_ELEM[x.idx], x.idx%2===0)===tg) count++; });
-    branchList.forEach(x=>{ if(tenGod(dayStemIdx, BRANCH_ELEM[x.idx], x.idx%2===0)===tg) count++; });
+    branchList.forEach(x=>{ if(tenGod(dayStemIdx, BRANCH_ELEM[x.idx], BRANCH_YANG[x.idx])===tg) count++; });
     let countNote;
     if(count>=3) countNote = `<p><b>내 사주에서는:</b> 현재 표시된 자리 중 ${count}곳에 이 십신이 나타나 <b style="color:var(--seal);">비교적 강하게</b> 작용합니다. ${d.excess}</p>`;
     else if(count===0) countNote = `<p><b>내 사주에서는:</b> 이 십신이 <b style="color:var(--seal);">전혀 나타나지 않습니다.</b> ${d.lack}</p>`;
@@ -1792,9 +1801,9 @@ window.__pip = (function(){
     if(!part) return `<div class="pillar"><div class="tag">${tag}</div><div class="hangeul" style="opacity:.5;">모름</div></div>`;
     const sElem=STEM_ELEM[part.stem], bElem=BRANCH_ELEM[part.branch];
     const sColor=ELEM_COLOR[sElem], bColor=ELEM_COLOR[bElem];
-    const stemYang = part.stem%2===0, branchYang = part.branch%2===0;
+    const stemYang = part.stem%2===0, branchYang = part.branch%2===0; // branchYang은 화면 표기용(陽/陰), 십신은 정기 기준(BRANCH_YANG)
     const stemTG = isDayStem ? '' : tenGod(dayStemIdx, sElem, stemYang);
-    const branchTG = tenGod(dayStemIdx, bElem, branchYang);
+    const branchTG = tenGod(dayStemIdx, bElem, BRANCH_YANG[part.branch]);
     const stemTGHtml = stemTG ? `<div class="tenGod tengod-btn" data-tg="${stemTG}" style="cursor:pointer;text-decoration:underline;text-decoration-style:dotted;">${stemTG}</div>` : `<div class="tenGod">&nbsp;</div>`;
     const branchTGHtml = branchTG ? `<div class="tenGod tengod-btn" data-tg="${branchTG}" style="cursor:pointer;text-decoration:underline;text-decoration-style:dotted;">${branchTG}</div>` : `<div class="tenGod">&nbsp;</div>`;
     const stage = hasTime===false && tag.indexOf('시')===0 ? '' : twelveStage(dayStemIdx, part.branch);
@@ -2072,14 +2081,14 @@ window.__pip = (function(){
     // 십신 (일간 제외 7자리)
     const tgParts = [
       ['년간', tenGod(dayStemIdx, STEM_ELEM[s.year.stem], s.year.stem%2===0)],
-      ['년지', tenGod(dayStemIdx, BRANCH_ELEM[s.year.branch], s.year.branch%2===0)],
+      ['년지', tenGod(dayStemIdx, BRANCH_ELEM[s.year.branch], BRANCH_YANG[s.year.branch])],
       ['월간', tenGod(dayStemIdx, STEM_ELEM[s.month.stem], s.month.stem%2===0)],
-      ['월지', tenGod(dayStemIdx, BRANCH_ELEM[s.month.branch], s.month.branch%2===0)],
-      ['일지', tenGod(dayStemIdx, BRANCH_ELEM[s.day.branch], s.day.branch%2===0)]
+      ['월지', tenGod(dayStemIdx, BRANCH_ELEM[s.month.branch], BRANCH_YANG[s.month.branch])],
+      ['일지', tenGod(dayStemIdx, BRANCH_ELEM[s.day.branch], BRANCH_YANG[s.day.branch])]
     ];
     if(s.hour) tgParts.push(
       ['시간', tenGod(dayStemIdx, STEM_ELEM[s.hour.stem], s.hour.stem%2===0)],
-      ['시지', tenGod(dayStemIdx, BRANCH_ELEM[s.hour.branch], s.hour.branch%2===0)]
+      ['시지', tenGod(dayStemIdx, BRANCH_ELEM[s.hour.branch], BRANCH_YANG[s.hour.branch])]
     );
     lines.push('십신: ' + tgParts.map(([k,v])=>`${k}=${v}`).join(', '));
 
@@ -2136,7 +2145,7 @@ window.__pip = (function(){
 
     // ---- 대운·세운·월운이 원국과 만나는 합·충·형·해를 앱이 직접 계산해서 AI에 전달 ----
     const ganji=(st,br)=>`${STEM_HANJA[st]}${BRANCH_HANJA[br]}(${STEMS[st]}${BRANCHES[br]})`;
-    const tgOf=(st,br)=>`천간 십신 ${tenGod(dayStemIdx, STEM_ELEM[st], st%2===0)}, 지지 십신 ${tenGod(dayStemIdx, BRANCH_ELEM[br], br%2===0)}, 십이운성 ${twelveStage(dayStemIdx, br)}`;
+    const tgOf=(st,br)=>`천간 십신 ${tenGod(dayStemIdx, STEM_ELEM[st], st%2===0)}, 지지 십신 ${tenGod(dayStemIdx, BRANCH_ELEM[br], BRANCH_YANG[br])}, 십이운성 ${twelveStage(dayStemIdx, br)}`;
     // layers: 원국 위에 얹어 볼 운(대운·세운·월운). targetKey가 들어간 관계만 골라낸다.
     const relText=(layers, targetKey)=>{
       const sl=[{idx:s.year.stem,label:'년간'},{idx:s.month.stem,label:'월간'},{idx:s.day.stem,label:'일간'}];
@@ -2148,14 +2157,14 @@ window.__pip = (function(){
       return found.length ? found.map(r=>`${r.pair.join('-')} ${r.charName||r.type}(${r.type})`).join(', ') : '두드러진 합·충·형·해 없음';
     };
     const dwAll=(year && month && day) ? computeDaewoon(s, isMaleFlag, year, month, day) : null;
-    const dwForYear=(y)=>{ if(!dwAll||!year) return null; const a=y-year+1; return dwAll.list.find(it=>a>=it.ageFrom&&a<=it.ageTo)||null; };
+    const dwForYear=(y)=>{ if(!dwAll||!year) return null; const a=y-year+1; const ix=dwIdxForAge(dwAll.list,a); return ix>=0?dwAll.list[ix]:null; };
 
     // 대운 (현재 나이대 + 앞으로 몇 단계)
     if(year && month && day){
       const dw = computeDaewoon(s, isMaleFlag, year, month, day);
       const nowYear = new Date().getFullYear();
       const age = nowYear - year + 1; // 한국식 나이(대략)
-      const cur = dw.list.find(it=>age>=it.ageFrom && age<=it.ageTo) || dw.list[0];
+      const cur = dw.list[Math.max(0, dwIdxForAge(dw.list, age))];
       lines.push(`대운: ${dw.forward?'순행':'역행'}, 대운수 ${dw.daewoonSu}, 현재(만 나이 약 ${age-1}세 기준) 대운=${STEM_HANJA[cur.stem]}${BRANCH_HANJA[cur.branch]}(${cur.ageFrom}~${cur.ageTo}세)`);
       const upcoming = dw.list.filter(it=>it.ageFrom>=cur.ageFrom).slice(0,4);
       lines.push('앞으로의 대운 흐름: ' + upcoming.map(it=>`${STEM_HANJA[it.stem]}${BRANCH_HANJA[it.branch]}(${it.ageFrom}~${it.ageTo}세)`).join(' → '));
@@ -2166,7 +2175,7 @@ window.__pip = (function(){
     // 오늘 날짜 + 올해/내년 세운 (AI가 지금이 몇 년인지 알 수 있도록)
     const _now=new Date(), ny=_now.getFullYear(), nmo=_now.getMonth()+1, nd=_now.getDate();
     const _gz=(y)=>{ const i=mod(y-4,60), st=mod(i,10), br=mod(i,12);
-      return `${STEM_HANJA[st]}${BRANCH_HANJA[br]}(${STEMS[st]}${BRANCHES[br]}년, 천간 십신 ${tenGod(dayStemIdx, STEM_ELEM[st], st%2===0)}, 지지 십신 ${tenGod(dayStemIdx, BRANCH_ELEM[br], br%2===0)})`; };
+      return `${STEM_HANJA[st]}${BRANCH_HANJA[br]}(${STEMS[st]}${BRANCHES[br]}년, 천간 십신 ${tenGod(dayStemIdx, STEM_ELEM[st], st%2===0)}, 지지 십신 ${tenGod(dayStemIdx, BRANCH_ELEM[br], BRANCH_YANG[br])})`; };
     lines.unshift(`[오늘 날짜] ${ny}년 ${nmo}월 ${nd}일 — 지금은 ${ny}년입니다. ${ny-1}년 이전은 이미 지나간 과거이며, '올해'는 ${ny}년, '내년'은 ${ny+1}년입니다.`);
     const yearLine=(label,y)=>{
       const i=mod(y-4,60), st=mod(i,10), br=mod(i,12);
@@ -2720,7 +2729,7 @@ window.__pip = (function(){
       selectedDwIdx=null; btn.textContent='대운';
     } else {
       const nowYear=new Date().getFullYear(), age=nowYear-state.year+1;
-      const idx=state.dw.list.findIndex(it=>age>=it.ageFrom && age<=it.ageTo);
+      const idx=dwIdxForAge(state.dw.list, age);
       if(idx===-1) return;
       selectedDwIdx=idx; btn.textContent='접기';
     }
@@ -2760,7 +2769,7 @@ window.__pip = (function(){
     yy=Math.min(state.year+119, Math.max(state.year, Math.round(yy))); // 태어난 해 ~ 약 120년
     selectedSwYear=yy;
     let dwIdx=-1;
-    if(state.dw){ const age=yy-state.year+1; dwIdx=state.dw.list.findIndex(it=>age>=it.ageFrom && age<=it.ageTo); }
+    if(state.dw){ const age=yy-state.year+1; dwIdx=dwIdxForAge(state.dw.list, age); }
     selectedDwIdx = dwIdx===-1 ? null : dwIdx; // 대운이 시작되기 전 나이면 대운 기둥은 붙이지 않는다
     const bs=document.getElementById('btnSwPillar'), bd=document.getElementById('btnDwPillar');
     if(bs) bs.textContent='접기';
@@ -2852,7 +2861,7 @@ window.__pip = (function(){
       let gyClass='gy-mid', gyText='평운';
       if(elem===ys.yong||elem===ys.hui){ gyClass='gy-good'; gyText='길운'; }
       else if(elem===ys.gi||elem===ys.gu){ gyClass='gy-bad'; gyText='주의'; }
-      const isCurrent = curAge>=item.ageFrom && curAge<=item.ageTo;
+      const isCurrent = (i===dwIdxForAge(dw.list, curAge));
       return `<button type="button" class="dw-row dw-row-btn${isCurrent?' cur-row':''}" data-idx="${i}">
         <div class="age">${isCurrent?'▶ ':''}${item.label}<br>${item.ageFrom}~${item.ageTo}세</div>
         <div class="gz" style="color:${ELEM_COLOR[elem]}">${STEM_HANJA[item.stem]}${BRANCH_HANJA[item.branch]}</div>
@@ -3483,7 +3492,7 @@ window.__pip = (function(){
     const item = dw.list[idx];
     const elem = STEM_ELEM[item.stem], branchElem = BRANCH_ELEM[item.branch];
     const tgStem = tenGod(dayStemIdx, elem, item.stem%2===0);
-    const tgBranch = tenGod(dayStemIdx, branchElem, item.branch%2===0);
+    const tgBranch = tenGod(dayStemIdx, branchElem, BRANCH_YANG[item.branch]);
     const stage = twelveStage(dayStemIdx, item.branch);
     let gyText='평운', gyDesc='이 시기는 용신·기신 어느 쪽에도 강하게 치우치지 않는 평이한 흐름입니다.';
     if(elem===ys.yong||elem===ys.hui){ gyText='길운'; gyDesc='이 시기는 용신 또는 희신에 해당하는 기운이 들어오는 때로, 전반적으로 안정과 발전에 유리한 흐름입니다.'; }
@@ -3492,7 +3501,7 @@ window.__pip = (function(){
     // 원국(년월일시) + 대운을 합친 형충회합 · 십이운성 (지금 지나는 대운이면 올해 세운도 함께 반영)
     const nowYearForDw = new Date().getFullYear();
     const curAgeForDw = state.year ? (nowYearForDw - state.year + 1) : null;
-    const isCurrentDw = curAgeForDw!==null && curAgeForDw>=item.ageFrom && curAgeForDw<=item.ageTo;
+    const isCurrentDw = curAgeForDw!==null && dwIdxForAge(state.dw.list, curAgeForDw)===idx;
     const swIdxForDw = mod(nowYearForDw-4,60);
     const swStemForDw = mod(swIdxForDw,10), swBranchForDw = mod(swIdxForDw,12);
     const stemList=[{idx:s.year.stem,label:'년간'},{idx:s.month.stem,label:'월간'},{idx:s.day.stem,label:'일간'}];
@@ -3512,7 +3521,7 @@ window.__pip = (function(){
     const gyeokNote=gyeokFeedbackNote(gyeok, combinedRels, '대운간');
 
     document.getElementById('panel-daewoon').innerHTML = `
-      <h4>${item.label} · 만 ${item.ageFrom}~${item.ageTo}세 풀이</h4>
+      <h4>${item.label} · ${item.ageFrom}~${item.ageTo}세 풀이</h4>
       <p><b>${STEM_HANJA[item.stem]}${BRANCH_HANJA[item.branch]}</b>(${STEMS[item.stem]}${BRANCHES[item.branch]}) · 천간 십신 <b>${tgStem}</b> · 지지 십신 <b>${tgBranch}</b> · 십이운성 <b>${stage}</b> · <b>${gyText}</b></p>
       <p>${TENGOD_DESC[tgStem]}</p>
       <p>${TENGOD_DESC[tgBranch]}</p>
@@ -3533,7 +3542,7 @@ window.__pip = (function(){
       const ctxBlock = ctx ? `\n\n[질문자가 알려준 현재 상황]\n${ctx}\n\n위 상황은 질문자가 직접 알려준 사실이니 이것만 참고하고, 확인되지 않은 사실을 새로 지어내지 마.` : '';
       const relBlock = combinedRels.length ? `\n원국+대운${isCurrentDw?'+올해 세운(지금 지나는 대운이라 함께 반영)':''} 형충회합: ${combinedRels.map(r=>`${r.pair.join('-')} ${r.type}`).join(', ')}` : '';
       const gyeokBlock = gyeokNote ? `\n${gyeokNote}` : '';
-      return `다음은 한 사람의 사주 정보입니다.\n\n${summary}${relBlock}${gyeokBlock}${ctxBlock}${expertGyeokGuidance()}${unGuidance()}\n\n이 사람의 "${item.label}"(만 나이 약 ${item.ageFrom}~${item.ageTo}세, 대운 간지 ${STEM_HANJA[item.stem]}${BRANCH_HANJA[item.branch]}, 천간 십신 ${tgStem}, 지지 십신 ${tgBranch}, 십이운성 ${stage}, 용신 기준 ${gyText})에 대해 풀이해줘. 원국과 이 대운 사이의 형충회합 관계도 참고해줘.\n\n[중요] 글을 하나로 죽 이어 쓰지 말고, 아래 항목별로 뚜렷하게 나눠서 써줘. 각 항목은 "◆ 항목 제목"을 단독으로 한 줄 쓴 뒤 한 줄을 비우고 그 아래에 내용을 쓰고, 항목과 항목 사이도 한 줄을 비워서 구분해줘 (마크다운 기호 **, #, - 같은 건 쓰지 말고 순수한 글자와 ◆ 표시만 사용해줘):\n\n◆ 이 대운의 특이점\n이 대운이 다른 대운과 달리 이 사람에게 유독 두드러지게 작용하는 지점을 짚어줘. 예를 들면 원국과의 형충회합이 유난히 많은지 적은지, 용신에 정확히 부합하는지 아니면 기신에 해당하는지, 격국을 뒤흔드는 시기인지 등을 근거로 들어줘.\n\n◆ 이 시기 총평\n두루뭉술하게 얼버무리지 말고 명확한 어조로 이 대운의 전체적인 성격을 결론부터 제시한 뒤 근거를 설명해줘.\n\n◆ 직업·재물 흐름\n\n◆ 대인관계 흐름\n\n◆ 건강 유의사항\n형충회합·십이운성이 약해지는지를 근거로 "심신을 더 돌봐야 할 시기"라는 식의 일반적인 주의 환기 선에서만 다루고, 특정 사고나 질병을 단정하거나 예측하지는 마.\n\n각 항목의 내용은 분량 제한 없이 충분히 깊이 있게 써주되, 항목 안에서도 문단을 나눠 읽기 편하게 써줘.`;
+      return `다음은 한 사람의 사주 정보입니다.\n\n${summary}${relBlock}${gyeokBlock}${ctxBlock}${expertGyeokGuidance()}${unGuidance()}\n\n이 사람의 "${item.label}"(한국식 나이 ${item.ageFrom}~${item.ageTo}세, 대운 간지 ${STEM_HANJA[item.stem]}${BRANCH_HANJA[item.branch]}, 천간 십신 ${tgStem}, 지지 십신 ${tgBranch}, 십이운성 ${stage}, 용신 기준 ${gyText})에 대해 풀이해줘. 원국과 이 대운 사이의 형충회합 관계도 참고해줘.\n\n[중요] 글을 하나로 죽 이어 쓰지 말고, 아래 항목별로 뚜렷하게 나눠서 써줘. 각 항목은 "◆ 항목 제목"을 단독으로 한 줄 쓴 뒤 한 줄을 비우고 그 아래에 내용을 쓰고, 항목과 항목 사이도 한 줄을 비워서 구분해줘 (마크다운 기호 **, #, - 같은 건 쓰지 말고 순수한 글자와 ◆ 표시만 사용해줘):\n\n◆ 이 대운의 특이점\n이 대운이 다른 대운과 달리 이 사람에게 유독 두드러지게 작용하는 지점을 짚어줘. 예를 들면 원국과의 형충회합이 유난히 많은지 적은지, 용신에 정확히 부합하는지 아니면 기신에 해당하는지, 격국을 뒤흔드는 시기인지 등을 근거로 들어줘.\n\n◆ 이 시기 총평\n두루뭉술하게 얼버무리지 말고 명확한 어조로 이 대운의 전체적인 성격을 결론부터 제시한 뒤 근거를 설명해줘.\n\n◆ 직업·재물 흐름\n\n◆ 대인관계 흐름\n\n◆ 건강 유의사항\n형충회합·십이운성이 약해지는지를 근거로 "심신을 더 돌봐야 할 시기"라는 식의 일반적인 주의 환기 선에서만 다루고, 특정 사고나 질병을 단정하거나 예측하지는 마.\n\n각 항목의 내용은 분량 제한 없이 충분히 깊이 있게 써주되, 항목 안에서도 문단을 나눠 읽기 편하게 써줘.`;
     });
   }
 
@@ -3568,7 +3577,7 @@ window.__pip = (function(){
     const yIdx=mod(yy-4,60), stem=mod(yIdx,10), branch=mod(yIdx,12);
     const elem = STEM_ELEM[stem], branchElem = BRANCH_ELEM[branch];
     const tgStem = tenGod(dayStemIdx, elem, stem%2===0);
-    const tgBranch = tenGod(dayStemIdx, branchElem, branch%2===0);
+    const tgBranch = tenGod(dayStemIdx, branchElem, BRANCH_YANG[branch]);
     const stage = twelveStage(dayStemIdx, branch);
     let gyText='평운', gyDesc='이 해는 용신·기신 어느 쪽에도 강하게 치우치지 않는 평이한 흐름입니다.';
     if(elem===ys.yong||elem===ys.hui){ gyText='길운'; gyDesc='이 해는 용신 또는 희신에 해당하는 기운이 들어오는 때로, 전반적으로 안정과 발전에 유리한 흐름입니다.'; }
@@ -3576,7 +3585,7 @@ window.__pip = (function(){
 
     // 원국 + 세운(+ 그 해를 지나는 대운)을 합친 형충회합 · 십이운성
     const age = state.year ? (yy - state.year + 1) : null;
-    const dwItem = (state.dw && state.dw.list && age!==null) ? state.dw.list.find(it=>age>=it.ageFrom && age<=it.ageTo) : null;
+    const dwItem = (state.dw && state.dw.list && age!==null) ? (state.dw.list[dwIdxForAge(state.dw.list, age)]||null) : null;
     const stemList=[{idx:s.year.stem,label:'년간'},{idx:s.month.stem,label:'월간'},{idx:s.day.stem,label:'일간'}];
     if(s.hour) stemList.push({idx:s.hour.stem,label:'시간'});
     if(dwItem) stemList.push({idx:dwItem.stem,label:'대운간'});
@@ -3660,14 +3669,14 @@ window.__pip = (function(){
     const mapToGroup={비견:'비겁',겁재:'비겁',식신:'식상',상관:'식상',편재:'재성',정재:'재성',편관:'관성',정관:'관성',편인:'인성',정인:'인성'};
     const positions = [
       ['년간', tenGod(dayStemIdx, STEM_ELEM[s.year.stem], s.year.stem%2===0)],
-      ['년지', tenGod(dayStemIdx, BRANCH_ELEM[s.year.branch], s.year.branch%2===0)],
+      ['년지', tenGod(dayStemIdx, BRANCH_ELEM[s.year.branch], BRANCH_YANG[s.year.branch])],
       ['월간', tenGod(dayStemIdx, STEM_ELEM[s.month.stem], s.month.stem%2===0)],
-      ['월지', tenGod(dayStemIdx, BRANCH_ELEM[s.month.branch], s.month.branch%2===0)],
-      ['일지', tenGod(dayStemIdx, BRANCH_ELEM[s.day.branch], s.day.branch%2===0)]
+      ['월지', tenGod(dayStemIdx, BRANCH_ELEM[s.month.branch], BRANCH_YANG[s.month.branch])],
+      ['일지', tenGod(dayStemIdx, BRANCH_ELEM[s.day.branch], BRANCH_YANG[s.day.branch])]
     ];
     if(s.hour) positions.push(
       ['시간', tenGod(dayStemIdx, STEM_ELEM[s.hour.stem], s.hour.stem%2===0)],
-      ['시지', tenGod(dayStemIdx, BRANCH_ELEM[s.hour.branch], s.hour.branch%2===0)]
+      ['시지', tenGod(dayStemIdx, BRANCH_ELEM[s.hour.branch], BRANCH_YANG[s.hour.branch])]
     );
     const tgList = positions.map(p=>p[1]);
     tgList.forEach(tg=>{ if(mapToGroup[tg]) groups[mapToGroup[tg]]++; });
@@ -3804,14 +3813,14 @@ window.__pip = (function(){
     const {dayStemIdx, s, isMale:im, counts, strength, ys, year, month, day} = state;
     const nowYear=new Date().getFullYear();
     const idx=mod(nowYear-4,60), stem=mod(idx,10), branch=mod(idx,12), elem=STEM_ELEM[stem];
-    const tg=tenGod(dayStemIdx, elem, stem%2===0), branchElem=BRANCH_ELEM[branch], branchTg=tenGod(dayStemIdx, branchElem, branch%2===0);
+    const tg=tenGod(dayStemIdx, elem, stem%2===0), branchElem=BRANCH_ELEM[branch], branchTg=tenGod(dayStemIdx, branchElem, BRANCH_YANG[branch]);
     const nowMonth=new Date().getMonth()+1;
     const baseBranchList=[{idx:s.year.branch,label:'년지'},{idx:s.month.branch,label:'월지'},{idx:s.day.branch,label:'일지'}];
     if(s.hour) baseBranchList.push({idx:s.hour.branch,label:'시지'});
     let monthRows='';
     for(let m=1;m<=12;m++){
       const ms=computeSaju(nowYear, m, 15, 12, 0, false, false).month;
-      const mtg=tenGod(dayStemIdx, STEM_ELEM[ms.stem], ms.stem%2===0), mbtg=tenGod(dayStemIdx, BRANCH_ELEM[ms.branch], ms.branch%2===0);
+      const mtg=tenGod(dayStemIdx, STEM_ELEM[ms.stem], ms.stem%2===0), mbtg=tenGod(dayStemIdx, BRANCH_ELEM[ms.branch], BRANCH_YANG[ms.branch]);
       const isCur=m===nowMonth;
       const boxStyle=(isCur?'background:rgba(43,58,103,0.08);border-color:rgba(43,58,103,0.4);':'')+'display:block;';
       const tagStyle=isCur?' style="color:#2b3a67;"':'';
@@ -3852,7 +3861,7 @@ window.__pip = (function(){
       const monthLines=[];
       for(let m=1;m<=12;m++){
         const ms=computeSaju(nowYear, m, 15, 12, 0, false, false).month;
-        const mtg=tenGod(dayStemIdx, STEM_ELEM[ms.stem], ms.stem%2===0), mbtg=tenGod(dayStemIdx, BRANCH_ELEM[ms.branch], ms.branch%2===0);
+        const mtg=tenGod(dayStemIdx, STEM_ELEM[ms.stem], ms.stem%2===0), mbtg=tenGod(dayStemIdx, BRANCH_ELEM[ms.branch], BRANCH_YANG[ms.branch]);
         const monthRels=detectRelations([...baseBranchList,{idx:ms.branch,label:'월운'}]).filter(r=>r.pair.includes('월운'));
         const relText = monthRels.length ? ` | 원국과 ${monthRels.map(r=>r.type).join('·')}` : '';
         monthLines.push(`${m}월: ${STEM_HANJA[ms.stem]}${BRANCH_HANJA[ms.branch]}(${STEMS[ms.stem]}${BRANCHES[ms.branch]}) — 천간 십신 ${mtg}, 지지 십신 ${mbtg}${relText}`);
@@ -4017,8 +4026,8 @@ window.__pip = (function(){
       const crossLines = [
         `상대 일간(${STEM_HANJA[p.day.stem]})은 내 일간 기준 십신: ${tenGod(dayStemIdx, partnerElem, p.day.stem%2===0)}`,
         `내 일간(${STEM_HANJA[dayStemIdx]})은 상대 일간 기준 십신: ${tenGod(p.day.stem, myElem, dayStemIdx%2===0)}`,
-        `상대 일지(${BRANCH_HANJA[p.day.branch]})는 내 일간 기준 십신: ${tenGod(dayStemIdx, BRANCH_ELEM[p.day.branch], p.day.branch%2===0)}`,
-        `내 일지(${BRANCH_HANJA[s.day.branch]})는 상대 일간 기준 십신: ${tenGod(p.day.stem, BRANCH_ELEM[s.day.branch], s.day.branch%2===0)}`
+        `상대 일지(${BRANCH_HANJA[p.day.branch]})는 내 일간 기준 십신: ${tenGod(dayStemIdx, BRANCH_ELEM[p.day.branch], BRANCH_YANG[p.day.branch])}`,
+        `내 일지(${BRANCH_HANJA[s.day.branch]})는 상대 일간 기준 십신: ${tenGod(p.day.stem, BRANCH_ELEM[s.day.branch], BRANCH_YANG[s.day.branch])}`
       ];
 
       // 나와 상대방, 두 사람 사이(여덟 글자끼리)의 형충회합만 따로 뽑아낸다 (각자 자기 원국 안의 관계는 제외)
