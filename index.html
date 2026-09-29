@@ -269,6 +269,9 @@
     }
   }
 
+  #inpSwYear::-webkit-outer-spin-button, #inpSwYear::-webkit-inner-spin-button{ -webkit-appearance:none; margin:0; }
+  #inpSwYear{ -moz-appearance:textfield; appearance:textfield; }
+  #dwSwBar > *{ flex:0 0 auto; }
 </style>
 
 </head>
@@ -358,20 +361,25 @@
       <button type="button" class="tab-btn" data-tab="qna">실시간 Q&amp;A</button>
     </div>
 
-    <div style="display:flex; justify-content:flex-start; gap:6px; margin-top:10px; margin-bottom:8px; flex-wrap:wrap;">
+    <div id="dwSwBar" style="display:flex; justify-content:flex-start; gap:4px; margin-top:10px; margin-bottom:8px; flex-wrap:wrap;">
       <div style="display:flex; border:1px solid var(--rule); border-radius:8px; overflow:hidden;">
-        <button type="button" id="btnToggleRel" style="padding:6px 8px; font-size:11px; font-weight:600; background:#fffdf7; color:var(--ink); border:none; cursor:pointer; white-space:nowrap;">형충회합보기</button>
+        <button type="button" id="btnToggleRel" title="형충회합 보기 / 접기" style="padding:5px 6px; font-size:10.5px; font-weight:600; background:#fffdf7; color:var(--ink); border:none; cursor:pointer; white-space:nowrap;">형충회합</button>
       </div>
       <div style="display:flex; border:1px solid var(--rule); border-radius:8px; overflow:hidden;">
-        <button type="button" id="btnDwPillar" style="padding:6px 8px; font-size:11px; font-weight:600; background:#fffdf7; color:var(--ink); border:none; border-right:1px solid var(--rule); cursor:pointer; white-space:nowrap;">대운보기</button>
-        <button type="button" id="btnDwList" style="padding:6px 8px; font-size:11px; font-weight:600; background:#fffdf7; color:var(--ink); border:none; cursor:pointer; white-space:nowrap;">대운목록</button>
+        <button type="button" id="btnDwPillar" title="지금 나이의 대운 기둥을 원국 옆에 붙이기 / 접기" style="padding:5px 6px; font-size:10.5px; font-weight:600; background:#fffdf7; color:var(--ink); border:none; border-right:1px solid var(--rule); cursor:pointer; white-space:nowrap;">대운</button>
+        <button type="button" id="btnDwList" title="대운 목록 열기 / 접기" style="padding:5px 6px; font-size:10.5px; font-weight:600; background:#fffdf7; color:var(--ink); border:none; cursor:pointer; white-space:nowrap;">목록</button>
       </div>
       <div style="display:flex; border:1px solid var(--rule); border-radius:8px; overflow:hidden;">
-        <button type="button" id="btnSwPillar" style="padding:6px 8px; font-size:11px; font-weight:600; background:#fffdf7; color:var(--ink); border:none; border-right:1px solid var(--rule); cursor:pointer; white-space:nowrap;">세운보기</button>
-        <button type="button" id="btnSwList" style="padding:6px 8px; font-size:11px; font-weight:600; background:#fffdf7; color:var(--ink); border:none; cursor:pointer; white-space:nowrap;">세운목록</button>
+        <button type="button" id="btnSwPillar" title="올해 세운 기둥을 원국 옆에 붙이기 / 접기" style="padding:5px 6px; font-size:10.5px; font-weight:600; background:#fffdf7; color:var(--ink); border:none; border-right:1px solid var(--rule); cursor:pointer; white-space:nowrap;">세운</button>
+        <button type="button" id="btnSwList" title="세운 목록(올해부터 10년) 열기 / 접기" style="padding:5px 6px; font-size:10.5px; font-weight:600; background:#fffdf7; color:var(--ink); border:none; cursor:pointer; white-space:nowrap;">목록</button>
       </div>
-      <button type="button" id="btnShowInputCard" class="go-btn" style="width:auto; padding:6px 8px; font-size:11px; font-weight:600; background:#fffdf7; color:var(--ink); border-color:var(--rule); display:none; white-space:nowrap;">✎다시입력</button>
-      <button type="button" id="btnEditToggle" class="go-btn" style="width:auto; padding:6px 8px; font-size:11px; font-weight:600; background:#fffdf7; color:var(--ink); border-color:var(--rule); display:inline-block; white-space:nowrap;">✎수동수정</button>
+      <div id="swYearBox" style="display:flex; align-items:center; border:1px solid var(--rule); border-radius:8px; overflow:hidden; background:#fffdf7;">
+        <button type="button" id="btnSwPrev" title="이전 해" style="padding:5px 6px; font-size:10.5px; font-weight:600; background:#fffdf7; color:var(--ink); border:none; cursor:pointer; white-space:nowrap; border-right:1px solid var(--rule);">◀</button>
+        <input type="number" id="inpSwYear" inputmode="numeric" aria-label="세운 연도" placeholder="연도" style="width:50px; padding:5px 2px; font-size:11.5px; font-weight:600; text-align:center; border:none; background:#fffdf7; color:var(--ink);">
+        <button type="button" id="btnSwNext" title="다음 해" style="padding:5px 6px; font-size:10.5px; font-weight:600; background:#fffdf7; color:var(--ink); border:none; cursor:pointer; white-space:nowrap; border-left:1px solid var(--rule);">▶</button>
+      </div>
+      <button type="button" id="btnShowInputCard" title="생년월일시 다시 입력하기" class="go-btn" style="width:auto; padding:5px 6px; font-size:10.5px; font-weight:600; background:#fffdf7; color:var(--ink); border-color:var(--rule); display:none; white-space:nowrap;">사주입력</button>
+      <button type="button" id="btnEditToggle" title="원국 간지·생년월일시를 직접 고쳐 보기" class="go-btn" style="width:auto; padding:5px 6px; font-size:10.5px; font-weight:600; background:#fffdf7; color:var(--ink); border-color:var(--rule); display:inline-block; white-space:nowrap;">사주 수정</button>
     </div>
 
     <div class="fold-card" style="margin-bottom:12px;">
@@ -1773,6 +1781,7 @@ window.__pip = (function(){
       if(el) el.classList.add('pinned');
     }
     if(selectedSwYear!=null){
+      const inpY=document.getElementById('inpSwYear'); if(inpY) inpY.value=selectedSwYear;
       const nowYear=new Date().getFullYear();
       const el=document.querySelector(`.sw-row-btn[data-idx="${selectedSwYear-nowYear}"]`);
       if(el) el.classList.add('pinned');
@@ -2708,12 +2717,12 @@ window.__pip = (function(){
     if(!state || !state.dw) return;
     const btn=this;
     if(selectedDwIdx!=null){
-      selectedDwIdx=null; btn.textContent='대운보기';
+      selectedDwIdx=null; btn.textContent='대운';
     } else {
       const nowYear=new Date().getFullYear(), age=nowYear-state.year+1;
       const idx=state.dw.list.findIndex(it=>age>=it.ageFrom && age<=it.ageTo);
       if(idx===-1) return;
-      selectedDwIdx=idx; btn.textContent='기둥접기';
+      selectedDwIdx=idx; btn.textContent='접기';
     }
     renderPillarsRow();
     renderRelPanel();
@@ -2723,15 +2732,15 @@ window.__pip = (function(){
     const btn=this, body=document.getElementById('dwBody');
     const open = body.style.display==='none';
     body.style.display = open ? 'block' : 'none';
-    btn.textContent = open ? '목록접기' : '대운목록';
+    btn.textContent = open ? '접기' : '목록';
   });
   document.getElementById('btnSwPillar').addEventListener('click', function(){
     if(!state) return;
     const btn=this;
     if(selectedSwYear!=null){
-      selectedSwYear=null; btn.textContent='세운보기';
+      selectedSwYear=null; btn.textContent='세운';
     } else {
-      selectedSwYear=new Date().getFullYear(); btn.textContent='기둥접기';
+      selectedSwYear=new Date().getFullYear(); btn.textContent='접기';
     }
     renderPillarsRow();
     renderRelPanel();
@@ -2741,13 +2750,40 @@ window.__pip = (function(){
     const btn=this, body=document.getElementById('swBody');
     const open = body.style.display==='none';
     body.style.display = open ? 'block' : 'none';
-    btn.textContent = open ? '목록접기' : '세운목록';
+    btn.textContent = open ? '접기' : '목록';
   });
+  // ---- 세운 연도 직접 선택: 그 해의 세운 기둥 + 그 나이가 속한 대운 기둥을 원국 옆에 붙인다 ----
+  function applyPickYear(yy){
+    if(!state || !state.year) return false;
+    const inp=document.getElementById('inpSwYear');
+    if(!Number.isFinite(yy)){ if(inp) inp.focus(); return false; }
+    yy=Math.min(state.year+119, Math.max(state.year, Math.round(yy))); // 태어난 해 ~ 약 120년
+    selectedSwYear=yy;
+    let dwIdx=-1;
+    if(state.dw){ const age=yy-state.year+1; dwIdx=state.dw.list.findIndex(it=>age>=it.ageFrom && age<=it.ageTo); }
+    selectedDwIdx = dwIdx===-1 ? null : dwIdx; // 대운이 시작되기 전 나이면 대운 기둥은 붙이지 않는다
+    const bs=document.getElementById('btnSwPillar'), bd=document.getElementById('btnDwPillar');
+    if(bs) bs.textContent='접기';
+    if(bd) bd.textContent = selectedDwIdx!=null ? '접기' : '대운';
+    if(inp) inp.value=yy;
+    renderPillarsRow();
+    renderRelPanel();
+    updateDwSwActiveStyles();
+    return true;
+  }
+  (function(){
+    const inp=document.getElementById('inpSwYear');
+    const cur=()=>parseInt(inp.value,10);
+    inp.addEventListener('keydown', e=>{ if(e.key==='Enter'){ e.preventDefault(); applyPickYear(cur()); } });
+    inp.addEventListener('change', ()=>{ if(Number.isFinite(cur())) applyPickYear(cur()); }); // 칸 밖을 클릭해도 적용
+    document.getElementById('btnSwPrev').addEventListener('click', ()=>applyPickYear((Number.isFinite(cur())?cur():new Date().getFullYear())-1));
+    document.getElementById('btnSwNext').addEventListener('click', ()=>applyPickYear((Number.isFinite(cur())?cur():new Date().getFullYear())+1));
+  })();
   document.getElementById('btnToggleRel').addEventListener('click', function(){
     const btn=this, body=document.getElementById('relList');
     const open = body.style.display==='none';
     body.style.display = open ? 'block' : 'none';
-    btn.textContent = open ? '형충회합접기' : '형충회합보기';
+    btn.textContent = open ? '형충접기' : '형충회합';
   });
 
   // ---- 계산 결과 렌더링 (최초 계산 및 수동 수정 적용 시 공용으로 사용) ----
@@ -2756,11 +2792,12 @@ window.__pip = (function(){
     const dayStemIdx=s.day.stem;
     selectedDwIdx=null; selectedSwYear=null;
     const btnDwP=document.getElementById('btnDwPillar'), btnSwP=document.getElementById('btnSwPillar');
-    if(btnDwP) btnDwP.textContent='대운보기';
-    if(btnSwP) btnSwP.textContent='세운보기';
+    if(btnDwP) btnDwP.textContent='대운';
+    if(btnSwP) btnSwP.textContent='세운';
+    { const inpY=document.getElementById('inpSwYear'); if(inpY){ inpY.min=year; inpY.max=year+119; inpY.value=new Date().getFullYear(); } }
     const btnDwL=document.getElementById('btnDwList'), btnSwL=document.getElementById('btnSwList');
-    if(btnDwL) btnDwL.textContent='대운목록';
-    if(btnSwL) btnSwL.textContent='세운목록';
+    if(btnDwL) btnDwL.textContent='목록';
+    if(btnSwL) btnSwL.textContent='목록';
     const dwBody=document.getElementById('dwBody'), swBody=document.getElementById('swBody');
     if(dwBody) dwBody.style.display='none';
     if(swBody) swBody.style.display='none';
@@ -2915,7 +2952,7 @@ window.__pip = (function(){
     document.getElementById('editModeSwitch').style.display='flex';
     setEditMode('ganji');
     document.getElementById('editControls').style.display='flex';
-    document.getElementById('btnEditToggle').style.display='none';
+    { const be=document.getElementById('btnEditToggle'); if(be) be.textContent='접기'; } // 버튼은 그대로 두고 글자만 바꾼다
   }
   function exitEditMode(){
     const ec=document.getElementById('editControls'), bt=document.getElementById('btnEditToggle');
@@ -2923,11 +2960,13 @@ window.__pip = (function(){
     if(ec) ec.style.display='none';
     if(ms) ms.style.display='none';
     if(ed) ed.style.display='none';
-    if(bt) bt.style.display='inline-block';
+    if(bt){ bt.style.display='inline-block'; bt.textContent='사주 수정'; }
     if(state) renderPillarsOnly();
   }
   document.getElementById('btnEditToggle').addEventListener('click', ()=>{
     if(!state){ alert('먼저 아래에서 생년월일시를 입력하고 "사주 계산하기"를 눌러주세요.'); return; }
+    const ecOpen=document.getElementById('editControls');
+    if(ecOpen && ecOpen.style.display==='flex'){ exitEditMode(); return; } // 수정 화면이 열려 있으면 접기 (적용하지 않은 수정은 취소와 같이 버려짐)
     enterEditMode();
   });
   document.getElementById('btnEditCancel').addEventListener('click', exitEditMode);
