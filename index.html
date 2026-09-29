@@ -298,7 +298,6 @@
     .print-sheet .ps-body{ font-size:16pt; line-height:1.85; white-space:pre-wrap; word-break:keep-all; overflow-wrap:break-word; orphans:3; widows:3; }
     .print-sheet .ps-q{ font-size:16pt; font-weight:700; margin-bottom:6pt; }
     .print-sheet .ps-qa{ break-inside:auto; }
-    .print-sheet .ps-foot{ margin-top:18pt; padding-top:8pt; border-top:1px solid #aaa; font-size:12pt; color:#444; }
   }
 </style>
 
@@ -2086,7 +2085,6 @@ window.__pip = (function(){
       const box=bar ? bar.previousElementSibling : null;
       add('div','ps-body', box ? box.textContent.trim() : '');
     }
-    add('div','ps-foot','※ 이 풀이는 AI가 만든 참고용 해석입니다. 사주 계산은 앱에서 이루어졌고, 해석은 중요한 결정의 유일한 근거로 삼지 마세요.');
     doc.body.appendChild(sheet);
     const clean=()=>{ if(sheet.isConnected) sheet.remove(); };
     win.addEventListener('afterprint', clean, {once:true});
