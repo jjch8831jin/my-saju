@@ -357,20 +357,20 @@
       <button type="button" class="tab-btn" data-tab="qna">실시간 Q&amp;A</button>
     </div>
 
-    <div style="display:flex; justify-content:flex-end; gap:6px; margin-top:10px; margin-bottom:8px; flex-wrap:wrap;">
+    <div style="display:flex; justify-content:flex-start; gap:6px; margin-top:10px; margin-bottom:8px; flex-wrap:wrap;">
       <div style="display:flex; border:1px solid var(--rule); border-radius:8px; overflow:hidden;">
-        <button type="button" id="btnToggleRel" style="padding:6px 8px; font-size:11px; background:#fffdf7; color:var(--ink); border:none; cursor:pointer; white-space:nowrap;">형충회합보기</button>
+        <button type="button" id="btnToggleRel" style="padding:6px 8px; font-size:11px; font-weight:600; background:#fffdf7; color:var(--ink); border:none; cursor:pointer; white-space:nowrap;">형충회합보기</button>
       </div>
       <div style="display:flex; border:1px solid var(--rule); border-radius:8px; overflow:hidden;">
-        <button type="button" id="btnDwPillar" style="padding:6px 8px; font-size:11px; background:#fffdf7; color:var(--ink); border:none; border-right:1px solid var(--rule); cursor:pointer; white-space:nowrap;">대운기둥</button>
-        <button type="button" id="btnDwList" style="padding:6px 8px; font-size:11px; background:#fffdf7; color:var(--ink); border:none; cursor:pointer; white-space:nowrap;">대운목록</button>
+        <button type="button" id="btnDwPillar" style="padding:6px 8px; font-size:11px; font-weight:600; background:#fffdf7; color:var(--ink); border:none; border-right:1px solid var(--rule); cursor:pointer; white-space:nowrap;">대운보기</button>
+        <button type="button" id="btnDwList" style="padding:6px 8px; font-size:11px; font-weight:600; background:#fffdf7; color:var(--ink); border:none; cursor:pointer; white-space:nowrap;">대운목록</button>
       </div>
       <div style="display:flex; border:1px solid var(--rule); border-radius:8px; overflow:hidden;">
-        <button type="button" id="btnSwPillar" style="padding:6px 8px; font-size:11px; background:#fffdf7; color:var(--ink); border:none; border-right:1px solid var(--rule); cursor:pointer; white-space:nowrap;">세운기둥</button>
-        <button type="button" id="btnSwList" style="padding:6px 8px; font-size:11px; background:#fffdf7; color:var(--ink); border:none; cursor:pointer; white-space:nowrap;">세운목록</button>
+        <button type="button" id="btnSwPillar" style="padding:6px 8px; font-size:11px; font-weight:600; background:#fffdf7; color:var(--ink); border:none; border-right:1px solid var(--rule); cursor:pointer; white-space:nowrap;">세운보기</button>
+        <button type="button" id="btnSwList" style="padding:6px 8px; font-size:11px; font-weight:600; background:#fffdf7; color:var(--ink); border:none; cursor:pointer; white-space:nowrap;">세운목록</button>
       </div>
-      <button type="button" id="btnShowInputCard" class="go-btn" style="width:auto; padding:6px 8px; font-size:11px; background:#fffdf7; color:var(--ink); border-color:var(--rule); display:none; white-space:nowrap;">✎다시입력</button>
-      <button type="button" id="btnEditToggle" class="go-btn" style="width:auto; padding:6px 8px; font-size:11px; background:#fffdf7; color:var(--ink); border-color:var(--rule); display:inline-block; white-space:nowrap;">✎수동수정</button>
+      <button type="button" id="btnShowInputCard" class="go-btn" style="width:auto; padding:6px 8px; font-size:11px; font-weight:600; background:#fffdf7; color:var(--ink); border-color:var(--rule); display:none; white-space:nowrap;">✎다시입력</button>
+      <button type="button" id="btnEditToggle" class="go-btn" style="width:auto; padding:6px 8px; font-size:11px; font-weight:600; background:#fffdf7; color:var(--ink); border-color:var(--rule); display:inline-block; white-space:nowrap;">✎수동수정</button>
     </div>
 
     <div class="fold-card" style="margin-bottom:12px;">
@@ -2677,7 +2677,7 @@
     if(!state || !state.dw) return;
     const btn=this;
     if(selectedDwIdx!=null){
-      selectedDwIdx=null; btn.textContent='대운기둥';
+      selectedDwIdx=null; btn.textContent='대운보기';
     } else {
       const nowYear=new Date().getFullYear(), age=nowYear-state.year+1;
       const idx=state.dw.list.findIndex(it=>age>=it.ageFrom && age<=it.ageTo);
@@ -2698,7 +2698,7 @@
     if(!state) return;
     const btn=this;
     if(selectedSwYear!=null){
-      selectedSwYear=null; btn.textContent='세운기둥';
+      selectedSwYear=null; btn.textContent='세운보기';
     } else {
       selectedSwYear=new Date().getFullYear(); btn.textContent='기둥접기';
     }
@@ -2725,8 +2725,8 @@
     const dayStemIdx=s.day.stem;
     selectedDwIdx=null; selectedSwYear=null;
     const btnDwP=document.getElementById('btnDwPillar'), btnSwP=document.getElementById('btnSwPillar');
-    if(btnDwP) btnDwP.textContent='대운기둥';
-    if(btnSwP) btnSwP.textContent='세운기둥';
+    if(btnDwP) btnDwP.textContent='대운보기';
+    if(btnSwP) btnSwP.textContent='세운보기';
     const btnDwL=document.getElementById('btnDwList'), btnSwL=document.getElementById('btnSwList');
     if(btnDwL) btnDwL.textContent='대운목록';
     if(btnSwL) btnSwL.textContent='세운목록';
@@ -2758,7 +2758,6 @@
       bits.push(part1, part2);
       bits.push(hasTime? (shiLabel? shiLabel : String(hour).padStart(2,'0')+':'+String(minute).padStart(2,'0')) : '시간 미상');
       bits.push(im?'남자':'여자');
-      if(convertedNote) bits.push(convertedNote.trim());
       if(hasTime) bits.push(applyTrueSolar?`진태양시 보정 적용${longitude&&longitude!==127.5?`(경도 ${longitude}°)`:''}`:'보정 미적용(시계 시각 그대로)');
       if(edited) bits.push('✎ 직접 수정됨');
       const el=document.getElementById('introNote');
