@@ -264,7 +264,6 @@
 
   <div class="eyebrow">生年月日時 명식 계산</div>
   <h1><span class="seal">命</span>사주원국</h1>
-  <p class="sub keep-size">태어난 연·월·일·시를 넣으면 년주·월주·일주·시주와 십신·지장간·십이운성·형충회합·용신·대운·세운, 그리고 AI 심층 사주풀이·궁합·운세·택일·별자리까지 함께 볼 수 있습니다.</p>
 
   <div class="card" id="inputCard">
     <div class="row">
@@ -330,40 +329,21 @@
     <button class="go-btn" id="btnGo">사주 계산하기</button>
   </div>
 
-  <div class="fold-card" style="margin-bottom:12px;">
-    <div class="fold-head" style="display:flex; align-items:center; gap:10px; cursor:pointer; min-width:0; padding:13px; background:#3d7a5c; color:#ffffff; border:1px solid #2f6148; border-radius:8px; font-weight:700; letter-spacing:0.04em;">
-      <span class="fold-caret" style="flex:none; font-size:14pt;">▸</span>
-      <span style="flex:none; font-size:14pt; font-weight:700;">현재 상황</span>
-      <span class="fold-preview" style="flex:1; min-width:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; font-size:14pt; font-weight:400; opacity:0.9;"></span>
-    </div>
-    <div class="fold-body" style="display:none; margin-top:6px; background:rgba(255,252,244,0.85); border:1px solid #3d7a5c; border-radius:10px; padding:12px 14px;">
-      <div class="keep-size" style="font-size:10pt; color:var(--ink-soft); margin-bottom:6px;">사주풀이·운세·궁합·실시간 Q&amp;A에 함께 반영돼요 · 빈 곳을 누르면 접혀요</div>
-      <div class="voice-input-wrap">
-        <textarea id="ctxShared" rows="4" placeholder="예: 이직을 고민 중이다, 최근 다투는 일이 많다 등" style="width:100%; font-family:inherit; font-size:14pt; padding:9px 10px; border:1px solid var(--rule); border-radius:8px; background:#fffdf7; resize:vertical; min-height:96px; max-height:40vh; overflow-y:auto;"></textarea>
-        <button type="button" class="mic-btn" id="micCtxShared" title="음성으로 입력">🎤</button>
-      </div>
-      <div class="mic-err" id="micErrCtxShared"></div>
-    </div>
-  </div>
-  <div class="fold-card" style="margin-bottom:28px;">
-    <div class="fold-head" style="display:flex; align-items:center; gap:10px; cursor:pointer; min-width:0; padding:13px; background:#2b3a67; color:#ffffff; border:1px solid #202c50; border-radius:8px; font-weight:700; letter-spacing:0.04em;">
-      <span class="fold-caret" style="flex:none; font-size:14pt;">▸</span>
-      <span style="flex:none; font-size:14pt; font-weight:700;">AI 풀이 지침</span>
-      <span class="fold-preview" style="flex:1; min-width:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; font-size:14pt; font-weight:400; opacity:0.9;"></span>
-    </div>
-    <div class="fold-body" style="display:none; margin-top:6px; background:rgba(255,252,244,0.85); border:1px solid #2b3a67; border-radius:10px; padding:12px 14px;">
-      <div class="keep-size" style="font-size:10pt; color:var(--ink-soft); margin-bottom:6px;">사주풀이·운세·궁합·대운/세운·별자리·실시간 Q&amp;A 모든 AI 풀이가 이 지침을 지켜서 답해요 · 빈 곳을 누르면 접혀요</div>
-      <div class="voice-input-wrap">
-        <textarea id="guideShared" rows="4" placeholder="예: 존댓말로 답해줘 / 결론부터 말해줘 / 불교 관점에서 풀이해줘 / 좋은 말만 하지 말고 주의할 점도 꼭 짚어줘 / 두루뭉술한 표현 금지" style="width:100%; font-family:inherit; font-size:14pt; padding:9px 10px; border:1px solid var(--rule); border-radius:8px; background:#fffdf7; resize:vertical; min-height:96px; max-height:40vh; overflow-y:auto;"></textarea>
-        <button type="button" class="mic-btn" id="micGuideShared" title="음성으로 입력">🎤</button>
-      </div>
-      <div class="mic-err" id="micErrGuideShared"></div>
-      <div id="guideSavedNote" class="keep-size" style="font-size:10pt;color:var(--ink-soft);margin-top:6px;">입력하면 이 브라우저에 자동 저장되어 다음에 열어도 그대로 남아 있어요.</div>
-    </div>
-  </div>
-
   <div id="result">
     <div class="result-head"><h2 id="resultTitle">사주원국</h2><span id="resultMeta"></span></div>
+
+    <div class="tabs" id="tabs">
+      <button type="button" class="tab-btn" data-tab="reading">사주풀이</button>
+      <button type="button" class="tab-btn" data-tab="compat">궁합</button>
+      <button type="button" class="tab-btn" data-tab="fortune">운세</button>
+      <button type="button" class="tab-btn" data-tab="wedding">결혼택일</button>
+      <button type="button" class="tab-btn" data-tab="moving">이사택일</button>
+      <button type="button" class="tab-btn" data-tab="prayer">기도택일</button>
+      <button type="button" class="tab-btn" data-tab="zodiac">별자리</button>
+      <button type="button" class="tab-btn" data-tab="qna">실시간 Q&amp;A</button>
+    </div>
+    <p class="note keep-size" id="introNote" style="margin-top:14px; margin-bottom:22px; font-size:10pt;"></p>
+
     <div style="display:flex; justify-content:flex-end; gap:6px; margin-bottom:8px; flex-wrap:wrap;">
       <div style="display:flex; border:1px solid var(--rule); border-radius:8px; overflow:hidden;">
         <button type="button" id="btnToggleRel" style="padding:6px 8px; font-size:11px; background:#fffdf7; color:var(--ink); border:none; cursor:pointer; white-space:nowrap;">형충회합보기</button>
@@ -402,23 +382,43 @@
       <button type="button" id="btnEditCancel" class="go-btn" style="flex:0 0 auto; background:#fffdf7; color:var(--ink); border-color:var(--rule);">취소</button>
     </div>
 
-    <div class="tabs" id="tabs">
-      <button type="button" class="tab-btn" data-tab="reading">사주풀이</button>
-      <button type="button" class="tab-btn" data-tab="compat">궁합</button>
-      <button type="button" class="tab-btn" data-tab="fortune">운세</button>
-      <button type="button" class="tab-btn" data-tab="wedding">결혼택일</button>
-      <button type="button" class="tab-btn" data-tab="moving">이사택일</button>
-      <button type="button" class="tab-btn" data-tab="prayer">기도택일</button>
-      <button type="button" class="tab-btn" data-tab="zodiac">별자리</button>
-      <button type="button" class="tab-btn" data-tab="qna">실시간 Q&amp;A</button>
-    </div>
-    <p class="note keep-size" id="introNote" style="margin-top:14px; margin-bottom:22px; font-size:10pt;">위 버튼을 누르면 팝업창으로 해당 풀이를 볼 수 있어요.</p>
-
     <div class="balance">
       <h3>오행 분포</h3>
       <div class="bar" id="bar"></div>
       <div class="legend" id="legend"></div>
       <div class="yongsin-box" id="ysBox" style="margin-top:10px;padding-top:10px;border-top:1px dashed var(--rule);"></div>
+    </div>
+
+    <div class="fold-card" style="margin-bottom:12px;">
+      <div class="fold-head" style="display:flex; align-items:center; gap:10px; cursor:pointer; min-width:0; padding:13px; background:#3d7a5c; color:#ffffff; border:1px solid #2f6148; border-radius:8px; font-weight:700; letter-spacing:0.04em;">
+        <span class="fold-caret" style="flex:none; font-size:14pt;">▸</span>
+        <span style="flex:none; font-size:14pt; font-weight:700;">현재 상황</span>
+        <span class="fold-preview" style="flex:1; min-width:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; font-size:14pt; font-weight:400; opacity:0.9;"></span>
+      </div>
+      <div class="fold-body" style="display:none; margin-top:6px; background:rgba(255,252,244,0.85); border:1px solid #3d7a5c; border-radius:10px; padding:12px 14px;">
+        <div class="keep-size" style="font-size:10pt; color:var(--ink-soft); margin-bottom:6px;">사주풀이·운세·궁합·실시간 Q&amp;A에 함께 반영돼요 · 빈 곳을 누르면 접혀요</div>
+        <div class="voice-input-wrap">
+          <textarea id="ctxShared" rows="4" placeholder="예: 이직을 고민 중이다, 최근 다투는 일이 많다 등" style="width:100%; font-family:inherit; font-size:14pt; padding:9px 10px; border:1px solid var(--rule); border-radius:8px; background:#fffdf7; resize:vertical; min-height:96px; max-height:40vh; overflow-y:auto;"></textarea>
+          <button type="button" class="mic-btn" id="micCtxShared" title="음성으로 입력">🎤</button>
+        </div>
+        <div class="mic-err" id="micErrCtxShared"></div>
+      </div>
+    </div>
+    <div class="fold-card" style="margin-bottom:28px;">
+      <div class="fold-head" style="display:flex; align-items:center; gap:10px; cursor:pointer; min-width:0; padding:13px; background:#2b3a67; color:#ffffff; border:1px solid #202c50; border-radius:8px; font-weight:700; letter-spacing:0.04em;">
+        <span class="fold-caret" style="flex:none; font-size:14pt;">▸</span>
+        <span style="flex:none; font-size:14pt; font-weight:700;">AI 풀이 지침</span>
+        <span class="fold-preview" style="flex:1; min-width:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; font-size:14pt; font-weight:400; opacity:0.9;"></span>
+      </div>
+      <div class="fold-body" style="display:none; margin-top:6px; background:rgba(255,252,244,0.85); border:1px solid #2b3a67; border-radius:10px; padding:12px 14px;">
+        <div class="keep-size" style="font-size:10pt; color:var(--ink-soft); margin-bottom:6px;">사주풀이·운세·궁합·대운/세운·별자리·실시간 Q&amp;A 모든 AI 풀이가 이 지침을 지켜서 답해요 · 빈 곳을 누르면 접혀요</div>
+        <div class="voice-input-wrap">
+          <textarea id="guideShared" rows="4" placeholder="예: 존댓말로 답해줘 / 결론부터 말해줘 / 불교 관점에서 풀이해줘 / 좋은 말만 하지 말고 주의할 점도 꼭 짚어줘 / 두루뭉술한 표현 금지" style="width:100%; font-family:inherit; font-size:14pt; padding:9px 10px; border:1px solid var(--rule); border-radius:8px; background:#fffdf7; resize:vertical; min-height:96px; max-height:40vh; overflow-y:auto;"></textarea>
+          <button type="button" class="mic-btn" id="micGuideShared" title="음성으로 입력">🎤</button>
+        </div>
+        <div class="mic-err" id="micErrGuideShared"></div>
+        <div id="guideSavedNote" class="keep-size" style="font-size:10pt;color:var(--ink-soft);margin-top:6px;">입력하면 이 브라우저에 자동 저장되어 다음에 열어도 그대로 남아 있어요.</div>
+      </div>
     </div>
 
     <div class="panel" id="aiKeyPanel">
@@ -675,6 +675,21 @@
       if(diff<0) lo=mid; else hi=mid;
     }
     return (lo+hi)/2;
+  }
+  // JD(세계시) → 한국 표준시(UTC+9) 달력 날짜·시각
+  function jdToKST(jd){
+    const utcMs=(jd-2440587.5)*86400000;
+    const d=new Date(utcMs);
+    d.setUTCHours(d.getUTCHours()+9);
+    return { y:d.getUTCFullYear(), m:d.getUTCMonth()+1, day:d.getUTCDate(), h:d.getUTCHours(), mi:d.getUTCMinutes(), wd:d.getUTCDay() };
+  }
+  const SOLAR_TERM_NAMES=['입춘','우수','경칩','춘분','청명','곡우','입하','소만','망종','하지','소서','대서','입추','처서','백로','추분','한로','상강','입동','소설','대설','동지','소한','대한'];
+  // 태어난 시점을 기준으로, 24절기 중 바로 앞(방금 지난)과 바로 다음(곧 올) 절기를 찾는다
+  function findNearbySolarTerms(birthJD_UT){
+    const curLon=sunLongitude(birthJD_UT), adj=mod(curLon-315,360), idx=Math.floor(adj/15);
+    const prevLon=mod(315+15*idx,360), nextLon=mod(315+15*(idx+1),360);
+    const prevJD=solarTermJD(prevLon, birthJD_UT), nextJD=solarTermJD(nextLon, birthJD_UT);
+    return { prev:{name:SOLAR_TERM_NAMES[idx], ...jdToKST(prevJD)}, next:{name:SOLAR_TERM_NAMES[mod(idx+1,24)], ...jdToKST(nextJD)} };
   }
   function newMoonJD(k){
     const T=k/1236.85, T2=T*T, T3=T2*T, T4=T3*T;
@@ -1533,37 +1548,55 @@
 
     function build(rels, centers, svg, direction){
       const items = rels.map(r=>{
-        const xs = r.pair.map(lbl=>{ const c=colIndexFromLabel(lbl); return (c>=0 && centers[c]!=null) ? centers[c] : null; }).filter(x=>x!=null);
-        return xs.length>=2 ? {r, xs} : null;
+        const cols = r.pair.map(lbl=>colIndexFromLabel(lbl)).filter(c=>c>=0 && centers[c]!=null);
+        return cols.length>=2 ? {r, cols} : null;
       }).filter(Boolean);
       if(items.length===0) return;
-      const rowHeight=24;
+      const isNarrow = window.innerWidth<=480;
+      const rowHeight = isNarrow ? 30 : 24;
       const height=14+items.length*rowHeight;
       svg.setAttribute('height', height);
       svg.setAttribute('width', wrapRect.width);
       svg.setAttribute('viewBox', `0 0 ${wrapRect.width} ${height}`);
+
+      // 한 기둥(컬럼)에 관계가 여러 개 몰릴 때, 그 컬럼을 지나는 세로선들을 부채꼴로 벌려서
+      // 처음부터 서로 겹치지 않고 각자의 가로선까지 이어지게 한다(계단식).
+      const colTotal={}; items.forEach(({cols})=>{ cols.forEach(c=>{ colTotal[c]=(colTotal[c]||0)+1; }); });
+      const colSeen={};
+      const FAN_GAP = isNarrow ? 5 : 6;
+      const PALETTE=['#2b3a67','#a9812f','#3d7a5c','#a43d3d','#6b4fa0','#1f7a8c','#b5541f','#4f6b3d','#8c4f7a','#3d5a7a'];
+
       let content='';
-      items.forEach(({r,xs:xsRaw},i)=>{
-        const offset = (i%3-1)*4;
-        const xs = xsRaw.map(x=>x+offset);
+      items.forEach(({r,cols},i)=>{
+        const xs = cols.map(c=>{
+          const occ=colSeen[c]||0; colSeen[c]=occ+1;
+          const total=colTotal[c];
+          const fanOffset=(occ-(total-1)/2)*FAN_GAP;
+          return centers[c]+fanOffset;
+        });
         const xMin=Math.min(...xs), xMax=Math.max(...xs);
         const symbol=relSymbolFor(r.type);
-        const lineColor=relColorFor(r.type);
+        const lineColor=PALETTE[i%PALETTE.length];
         const elemChar = r.elem ? (ELEM_HANJA_MAP[r.elem]||'') : '';
-        const elemColor = r.elem ? (ELEM_COLOR[r.elem]||'#2b3a67') : '#2b3a67';
         let lineY;
         if(direction==='top'){
           lineY = height - 7 - i*rowHeight;
-          xs.forEach(x=>{ content += `<line x1="${x}" y1="${lineY}" x2="${x}" y2="${height}" stroke="${lineColor}" stroke-width="1.3"/>`; });
+          xs.forEach(x=>{
+            content += `<line x1="${x}" y1="${lineY}" x2="${x}" y2="${height}" stroke="${lineColor}" stroke-width="1.3"/>`;
+            content += `<circle cx="${x}" cy="${height}" r="2.5" fill="${lineColor}"/>`;
+          });
           content += `<line x1="${xMin}" y1="${lineY}" x2="${xMax}" y2="${lineY}" stroke="${lineColor}" stroke-width="1.3"/>`;
           content += `<text x="${(xMin+xMax)/2}" y="${lineY-4}" font-size="12" fill="${lineColor}" text-anchor="middle" font-family="'Nanum Myeongjo',serif">${symbol}</text>`;
-          if(elemChar) content += `<text x="${xMax+10}" y="${lineY+4}" font-size="12" fill="${elemColor}" font-family="'Nanum Myeongjo',serif">${elemChar}</text>`;
+          if(elemChar) content += `<text x="${xMax+10}" y="${lineY+4}" font-size="12" fill="${lineColor}" font-family="'Nanum Myeongjo',serif">${elemChar}</text>`;
         } else {
           lineY = 7 + i*rowHeight;
-          xs.forEach(x=>{ content += `<line x1="${x}" y1="0" x2="${x}" y2="${lineY}" stroke="${lineColor}" stroke-width="1.3"/>`; });
+          xs.forEach(x=>{
+            content += `<line x1="${x}" y1="0" x2="${x}" y2="${lineY}" stroke="${lineColor}" stroke-width="1.3"/>`;
+            content += `<circle cx="${x}" cy="0" r="2.5" fill="${lineColor}"/>`;
+          });
           content += `<line x1="${xMin}" y1="${lineY}" x2="${xMax}" y2="${lineY}" stroke="${lineColor}" stroke-width="1.3"/>`;
           content += `<text x="${(xMin+xMax)/2}" y="${lineY+15}" font-size="12" fill="${lineColor}" text-anchor="middle" font-family="'Nanum Myeongjo',serif">${symbol}</text>`;
-          if(elemChar) content += `<text x="${xMax+10}" y="${lineY+4}" font-size="12" fill="${elemColor}" font-family="'Nanum Myeongjo',serif">${elemChar}</text>`;
+          if(elemChar) content += `<text x="${xMax+10}" y="${lineY+4}" font-size="12" fill="${lineColor}" font-family="'Nanum Myeongjo',serif">${elemChar}</text>`;
         }
       });
       svg.innerHTML=content;
@@ -2651,6 +2684,23 @@
     const dwBody=document.getElementById('dwBody'), swBody=document.getElementById('swBody');
     if(dwBody) dwBody.style.display='none';
     if(swBody) swBody.style.display='none';
+
+    // 상단 안내문 자리에 양력·음력 생년월일시와 앞뒤 절기 정보를 표시
+    (function(){
+      const WD=['일','월','화','수','목','금','토'];
+      const solarWd = WD[new Date(Date.UTC(year,month-1,day)).getUTCDay()];
+      let line = `양 ${year}년 ${month}월 ${day}일(${solarWd})`;
+      const lun = solarToLunar(year, month, day);
+      if(lun) line += ` · 음 ${lun.month}월 ${lun.day}일${lun.isLeap?'(윤)':''}`;
+      if(hasTime) line += ` ${String(hour).padStart(2,'0')}:${String(minute).padStart(2,'0')}`;
+      if(s.birthJD_UT!==undefined){
+        const terms=findNearbySolarTerms(s.birthJD_UT);
+        const fmt=t=>`${t.m}월 ${t.day}일 ${String(t.h).padStart(2,'0')}:${String(t.mi).padStart(2,'0')}`;
+        line += ` · ${terms.prev.name} ${fmt(terms.prev)} · ${terms.next.name} ${fmt(terms.next)}`;
+      }
+      const el=document.getElementById('introNote');
+      if(el) el.textContent = line;
+    })();
 
     const counts={목:0,화:0,토:0,금:0,수:0};
     counts[STEM_ELEM[s.year.stem]]++; counts[BRANCH_ELEM[s.year.branch]]++;
