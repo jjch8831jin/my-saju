@@ -282,6 +282,21 @@
   .share-btn{ padding:3px 12px; font-size:11px; border:1px solid var(--rule); border-radius:8px; background:#fffdf7; color:var(--ink); cursor:pointer; }
   .share-btn:hover{ background:#2d2a4a; color:#fff; border-color:#2d2a4a; }
   .share-msg{ font-size:11px; color:var(--ink-soft); }
+  .print-sheet{ display:none; }
+  @media print{
+    @page{ size:A4 portrait; margin:18mm 16mm; }
+    html, body{ background:#fff !important; }
+    body > *:not(.print-sheet){ display:none !important; }
+    .print-sheet{ display:block !important; color:#000; font-family:'Noto Serif KR','Nanum Myeongjo','Batang','Times New Roman',serif; }
+    .print-sheet .ps-title{ font-size:17pt; margin:0 0 4pt; }
+    .print-sheet .ps-sub{ font-size:12pt; font-weight:700; margin-bottom:4pt; }
+    .print-sheet .ps-meta{ font-size:10pt; color:#333; line-height:1.6; }
+    .print-sheet hr{ border:0; border-top:1px solid #999; margin:10pt 0 12pt; }
+    .print-sheet .ps-body{ font-size:11.5pt; line-height:1.85; white-space:pre-wrap; word-break:keep-all; overflow-wrap:break-word; orphans:3; widows:3; }
+    .print-sheet .ps-q{ font-size:11.5pt; font-weight:700; margin-bottom:5pt; }
+    .print-sheet .ps-qa{ break-inside:auto; }
+    .print-sheet .ps-foot{ margin-top:16pt; padding-top:6pt; border-top:1px solid #bbb; font-size:9pt; color:#555; }
+  }
 </style>
 
 </head>
@@ -2015,6 +2030,7 @@ window.__pip = (function(){
   function buildShareBarHTML(){
     return '<button type="button" class="share-btn" data-share="copy">복사</button>'
       + (shareSupported() ? '<button type="button" class="share-btn" data-share="share">공유</button>' : '')
+      + '<button type="button" class="share-btn" data-share="print">인쇄</button>'
       + '<span class="share-msg"></span>';
   }
   function showShareBar(box){
@@ -2029,12 +2045,51 @@ window.__pip = (function(){
     const bar=box.nextElementSibling;
     if(bar && bar.classList && bar.classList.contains('share-bar')) bar.style.display='none';
   }
+  // ---- 인쇄: 머리말(풀이 종류·이름·생년월일시·여덟 글자·날짜) + 풀이 글만 종이용으로 만들어 인쇄 창을 띄운다 ----
+  function printFrom(btn, item, bar){
+    const doc=btn.ownerDocument, win=doc.defaultView||window;
+    const panel=btn.closest('.reading-panel');
+    const pid=panel ? panel.id : '';
+    let label=(typeof PANEL_LABELS!=='undefined' && PANEL_LABELS[pid]) || '사주 풀이';
+    const heading=panel ? panel.querySelector('h4') : null;
+    const sub = (!item && heading && (pid==='panel-daewoon'||pid==='panel-sewoon')) ? heading.textContent.trim() : '';
+    if(item) label += ' Q&A'; 
+    const sheet=doc.createElement('div'); sheet.className='print-sheet';
+    const add=(tag,cls,text)=>{ const el=doc.createElement(tag); if(cls) el.className=cls; el.textContent=text; sheet.appendChild(el); return el; };
+    add('h1','ps-title','사주 풀이 · '+label);
+    if(sub) add('div','ps-sub',sub);
+    if(state){
+      const intro=(document.getElementById('introNote')||{}).textContent||'';
+      const P=(pt)=>pt ? STEM_HANJA[pt.stem]+BRANCH_HANJA[pt.branch] : '미상';
+      const nm=state.name ? state.name+' · ' : '';
+      add('div','ps-meta', nm+intro);
+      add('div','ps-meta','년주 '+P(state.s.year)+'   월주 '+P(state.s.month)+'   일주 '+P(state.s.day)+'   시주 '+(state.s.hour?P(state.s.hour):'시간 미상'));
+    }
+    add('div','ps-meta','인쇄일 '+new Date().toLocaleDateString('ko-KR',{year:'numeric',month:'long',day:'numeric'}));
+    sheet.appendChild(doc.createElement('hr'));
+    if(item){
+      const q=item.firstElementChild, ans=item.querySelector('.ai-box');
+      const wrap=doc.createElement('div'); wrap.className='ps-qa'; sheet.appendChild(wrap);
+      const qe=doc.createElement('div'); qe.className='ps-q'; qe.textContent=q?q.textContent.trim():''; wrap.appendChild(qe);
+      const ae=doc.createElement('div'); ae.className='ps-body'; ae.textContent=ans?ans.textContent.trim():''; wrap.appendChild(ae);
+    } else {
+      const box=bar ? bar.previousElementSibling : null;
+      add('div','ps-body', box ? box.textContent.trim() : '');
+    }
+    add('div','ps-foot','※ 이 풀이는 AI가 만든 참고용 해석입니다. 사주 계산은 앱에서 이루어졌고, 해석은 중요한 결정의 유일한 근거로 삼지 마세요.');
+    doc.body.appendChild(sheet);
+    const clean=()=>{ if(sheet.isConnected) sheet.remove(); };
+    win.addEventListener('afterprint', clean, {once:true});
+    try{ win.print(); } catch(e){ clean(); }
+    setTimeout(clean, 120000); // 인쇄 창이 곧바로 돌아오는 브라우저를 위해 넉넉히 뒤에 정리
+  }
   // 복사·공유 버튼 (별도 창에서도 눌러지도록, 버튼이 들어 있는 창의 클립보드·공유 기능을 쓴다)
   document.addEventListener('click', async (e)=>{
     const t=e.target, b=(t && t.closest) ? t.closest('[data-share]') : null;
     if(!b) return;
     const bar=b.closest('.share-bar'), msg=bar ? bar.querySelector('.share-msg') : null;
     const item=b.closest('.qna-item');
+    if(b.dataset.share==='print'){ printFrom(b, item, bar); return; }
     let text='';
     if(item){
       const q=item.firstElementChild, ans=item.querySelector('.ai-box');
