@@ -268,6 +268,16 @@
       font-size:16pt !important;
     }
   }
+
+  /* 별도 창(Document Picture-in-Picture) 버튼: AI 풀이·질문이 있는 패널에서만 보임 */
+  .modal-pip{
+    display:none; position:absolute; top:14px; right:140px; width:34px; height:34px; border-radius:50%;
+    border:1px solid var(--rule); background:#fffdf7; font-size:16px; line-height:1;
+    cursor:pointer; color:var(--ink-soft); z-index:10;
+  }
+  .modal-pip:hover{ background:#2d2a4a; color:#fff; border-color:#2d2a4a; }
+  .modal-box:has(#panel-reading.show, #panel-compat.show, #panel-fortune.show, #panel-daewoon.show, #panel-sewoon.show, #panel-zodiac.show, #panel-qna.show) .modal-pip{ display:block; }
+  html.no-doc-pip .modal-pip{ display:none !important; }
 </style>
 
 </head>
@@ -486,6 +496,7 @@
 <div class="modal-overlay" id="modalOverlay">
   <div class="modal-box" id="modalBox">
     <div class="modal-drag-handle" id="modalDragHandle" title="끌어서 이동"></div>
+    <button type="button" class="modal-pip" id="modalPip" aria-label="별도 창으로 분리" title="별도 창으로 분리 (세컨드 모니터용)">⧉</button>
     <button type="button" class="modal-maximize" id="modalMaximize" aria-label="화면 채우기" title="화면 채우기">⛶</button>
     <button type="button" class="modal-minimize" id="modalMinimize" aria-label="최소화" title="최소화">－</button>
     <button type="button" class="modal-close" id="modalClose" aria-label="닫기">×</button>
@@ -513,6 +524,36 @@
 
 
 <script>
+// ---------- 별도 창(Document Picture-in-Picture) 준비 ----------
+// 메인 스크립트가 document에 거는 위임 클릭 핸들러를 기록해 두었다가 별도 창에서도 똑같이 동작하게 전달하고,
+// 별도 창으로 옮겨간 패널 안의 요소도 document.getElementById / querySelector 로 찾을 수 있게 해 줍니다.
+window.__pip = (function(){
+  const rec=[];
+  const nativeAdd=document.addEventListener.bind(document);
+  document.addEventListener=function(type,fn,opts){
+    if((type==='click'||type==='pointerdown') && typeof fn==='function'){
+      rec.push({ type:type, fn:fn, capture: opts===true || !!(opts && opts.capture) });
+    }
+    return nativeAdd(type,fn,opts);
+  };
+  const st={ win:null, doc:null, rec:rec };
+  const nGet=document.getElementById.bind(document);
+  const nQ=document.querySelector.bind(document);
+  const nQA=document.querySelectorAll.bind(document);
+  // 패널 전환·모달 관리용 선택자는 메인 문서 것만 본다 (별도 창의 패널이 같이 숨겨지는 것을 막기 위해)
+  const SKIP=/reading-panel|tab-btn|modal/;
+  document.getElementById=function(id){ return nGet(id) || (st.doc ? st.doc.getElementById(id) : null); };
+  document.querySelector=function(sel){
+    const r=nQ(sel);
+    if(r || !st.doc || SKIP.test(sel)) return r;
+    return st.doc.querySelector(sel);
+  };
+  document.querySelectorAll=function(sel){
+    if(!st.doc || SKIP.test(sel)) return nQA(sel);
+    return Array.from(nQA(sel)).concat(Array.from(st.doc.querySelectorAll(sel)));
+  };
+  return st;
+})();
 (function(){
   const STEMS=['갑','을','병','정','무','기','경','신','임','계'];
   const STEM_HANJA=['甲','乙','丙','丁','戊','己','庚','辛','壬','癸'];
@@ -2994,6 +3035,7 @@
   let detailReturnPanelId=null; // 운세/궁합 등 안에서 십신·지장간·십이운성·일간 설명을 열었을 때, 닫기를 누르면 돌아갈 원래 패널
   let detailReturnScrollTop=0; // 그 패널을 보던 스크롤 위치
   let minimizedPanels=[]; // 최소화된 패널들: {panelId, label, scrollTop}
+  let pipWin=null, pipPanelId=null, pipPanelEl=null, pipHolder=null, pipScroll=null, pipOpening=false; // 별도 창(PiP) 상태
   const PANEL_LABELS={
     'panel-reading':'사주풀이','panel-compat':'궁합','panel-fortune':'운세',
     'panel-wedding':'결혼택일','panel-moving':'이사택일','panel-prayer':'기도택일',
@@ -3001,6 +3043,7 @@
   };
   function openModal(tab){
     const panelId='panel-'+tab;
+    if(pipHolds(panelId)){ focusPip(); return; } // 이미 별도 창에 나가 있는 패널이면 그 창을 앞으로
     if(minimizedPanels.some(m=>m.panelId===panelId)){ restoreMinimized(panelId); return; }
     detailReturnPanelId=null;
     if(window.__resetModalPosition) window.__resetModalPosition();
@@ -3114,6 +3157,106 @@
   modalClose.addEventListener('click', closeOrGoBack);
   modalOverlay.addEventListener('click',(e)=>{ if(e.target===modalOverlay) closeOrGoBack(); });
   document.addEventListener('keydown',(e)=>{ if(e.key==='Escape' && modalOverlay.classList.contains('open')) closeOrGoBack(); });
+
+  // ---- 별도 창(Document Picture-in-Picture): AI 풀이·질문 패널을 세컨드 모니터용 창으로 분리 ----
+  // 패널 DOM을 복제하지 않고 그대로 옮기므로, 질문 전송·Enter 입력·음성 입력·대화 기록이 그대로 동작합니다.
+  const PIP_PANELS=['panel-reading','panel-compat','panel-fortune','panel-daewoon','panel-sewoon','panel-zodiac','panel-qna'];
+  const PIP_CSS=`
+    html, body.pip-body{ margin:0 !important; padding:0 !important; height:100%; }
+    body.pip-body{ min-height:0 !important; overflow:hidden; background:var(--paper); }
+    .pip-box{ width:100% !important; max-width:none !important; height:100vh; border-radius:0 !important;
+      box-shadow:none !important; animation:none !important; padding:10px 18px 8px !important;
+      display:flex; flex-direction:column; position:relative; }
+    .pip-box .modal-scroll{ flex:1; min-height:0; max-height:none !important; overflow-y:auto; }
+    .pip-box #panel-qna.show{ display:flex; flex-direction:column; min-height:100%; }
+    .pip-box #panel-qna #qnaHistoryBox{ flex:1; }
+    .pip-box, .pip-box *:not(h4):not(.mic-btn):not(.modal-close):not(#sourceTextarea){ font-size:14pt !important; }
+  `;
+  function pipSupported(){ return !!(window.documentPictureInPicture && window.documentPictureInPicture.requestWindow); }
+  function pipHolds(panelId){ return !!(pipWin && !pipWin.closed && pipPanelEl && pipPanelId===panelId); }
+  function focusPip(){ try{ if(pipWin) pipWin.focus(); }catch(e){} }
+  function pipInit(win){
+    pipWin=win; window.__pip.win=win; window.__pip.doc=win.document;
+    const d=win.document;
+    d.documentElement.lang='ko';
+    const base=d.createElement('base'); base.href=document.baseURI; d.head.appendChild(base);
+    document.head.querySelectorAll('style, link[rel="stylesheet"]').forEach(n=>{ d.head.appendChild(n.cloneNode(true)); });
+    const st=d.createElement('style'); st.textContent=PIP_CSS; d.head.appendChild(st);
+    d.body.className='pip-body';
+    const box=d.createElement('div'); box.className='modal-box pip-box';
+    pipScroll=d.createElement('div'); pipScroll.className='modal-scroll';
+    box.appendChild(pipScroll); d.body.appendChild(box);
+    // 메인 문서에 걸려 있는 위임 클릭 핸들러(관계 펼치기·십신/지장간 설명 버튼 등)를 별도 창에도 전달
+    ['click','pointerdown'].forEach(type=>{
+      [false,true].forEach(cap=>{
+        const hs=window.__pip.rec.filter(r=>r.type===type && r.capture===cap);
+        if(!hs.length) return;
+        d.addEventListener(type,(e)=>{ hs.forEach(r=>{ try{ r.fn.call(document,e); }catch(err){ console.error(err); } }); }, cap);
+      });
+    });
+    win.addEventListener('pagehide', ()=>{ if(pipWin===win) pipOnClosed(); });
+  }
+  // 패널만 메인으로 되돌린다 (숨김 상태). 되돌린 패널 id를 반환
+  function pipDockBack(){
+    if(!pipPanelEl) return null;
+    const panel=pipPanelEl, id=pipPanelId;
+    panel.classList.remove('show');
+    if(pipHolder && pipHolder.parentNode) pipHolder.parentNode.replaceChild(panel, pipHolder);
+    else { const sc=modalOverlay.querySelector('.modal-scroll'); if(sc) sc.appendChild(panel); }
+    pipPanelEl=null; pipHolder=null; pipPanelId=null;
+    return id;
+  }
+  // 별도 창이 닫혔을 때: 패널을 메인으로 되돌리고, 메인 팝업이 비어 있으면 그 패널을 다시 띄운다
+  function pipOnClosed(){
+    const id=pipDockBack();
+    pipWin=null; pipScroll=null; window.__pip.win=null; window.__pip.doc=null;
+    if(!id || modalOverlay.classList.contains('open')) return;
+    const tab=id.replace('panel-','');
+    document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
+    document.querySelectorAll('.reading-panel').forEach(p=>p.classList.remove('show'));
+    const tb=document.querySelector('.tab-btn[data-tab="'+tab+'"]'); if(tb) tb.classList.add('active');
+    const panel=document.getElementById(id); if(panel) panel.classList.add('show');
+    if(window.__resetModalPosition) window.__resetModalPosition();
+    modalOverlay.classList.toggle('fullscreen', tab==='qna');
+    modalOverlay.classList.add('open');
+    document.body.style.overflow='hidden';
+    if(tab==='qna') setTimeout(()=>{ const sc=getModalScroll(); if(sc) sc.scrollTop=sc.scrollHeight; }, 30);
+  }
+  async function openPip(){
+    if(pipOpening) return;
+    if(!pipSupported()){
+      alert('별도 창 기능은 Chrome/Edge(116 이상) 데스크톱 브라우저에서만 지원됩니다.');
+      return;
+    }
+    const shown=document.querySelector('.reading-panel.show'); // 메인 팝업에서 지금 보이는 패널
+    if(!shown || !PIP_PANELS.includes(shown.id)) return;
+    if(pipWin && pipWin.closed){ pipOnClosed(); }
+    if(!pipWin){
+      pipOpening=true;
+      try{
+        const win = await window.documentPictureInPicture.requestWindow({ width:820, height:920 });
+        pipInit(win);
+      } catch(e){
+        pipOpening=false;
+        alert('별도 창을 열지 못했습니다: '+e.message);
+        return;
+      }
+      pipOpening=false;
+    } else {
+      pipDockBack(); // 이미 별도 창이 열려 있으면 그 안의 패널은 메인으로 돌려보내고 새 패널로 교체
+    }
+    pipHolder=document.createComment('pip-holder');
+    shown.parentNode.insertBefore(pipHolder, shown);
+    pipScroll.appendChild(shown);
+    pipPanelEl=shown; pipPanelId=shown.id;
+    try{ pipWin.document.title='사주 · '+(PANEL_LABELS[shown.id]||''); }catch(e){}
+    pipScroll.scrollTop = 0;
+    if(shown.id==='panel-qna') setTimeout(()=>{ if(pipScroll) pipScroll.scrollTop=pipScroll.scrollHeight; }, 30);
+    closeModal(); // 메인 팝업은 비었으니 닫는다
+    focusPip();
+  }
+  document.getElementById('modalPip').addEventListener('click', openPip);
+  if(!pipSupported()) document.documentElement.classList.add('no-doc-pip');
 
   // ---- 소스 보기 ----
   // ---- 저장된 사주 목록 ----
@@ -3404,6 +3547,7 @@
         alert('먼저 아래에서 생년월일시를 입력하고 "사주 계산하기"를 눌러주세요.');
         return;
       }
+      if(pipHolds('panel-'+tab)){ focusPip(); return; } // 이미 별도 창에 나가 있는 패널이면 그 창을 앞으로
       if(modalOverlay.classList.contains('open')){
         // 모달이 이미 열려있으면 그 안에서 탭만 전환
         document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
