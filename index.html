@@ -1442,6 +1442,35 @@ window.__pip = (function(){
     const elemNote = r.elem ? ` (${r.elem} 기운)` : '';
     return `${r.charName||r.type} (${r.pair.join(' · ')}) — ${r.type}${elemNote}\n${desc}`;
   }
+  // ---- 마우스 설명 상자용 문구: 12신살·귀인·공망·특수 신살 (십이운성은 위 STAGE_DETAIL 을 그대로 쓴다) ----
+  const SINSAL_TIP={
+    '겁살':'빼앗기고 다투는 기운으로, 재물이나 관계에서 손실·경쟁에 유의하는 자리입니다.',
+    '재살':'뜻밖의 관재·송사, 갇히거나 막히는 일에 유의하는 기운입니다.',
+    '천살':'하늘에서 오는 재난, 어쩔 수 없는 외부 변수를 뜻하며 겸손과 대비가 필요합니다.',
+    '지살':'새로운 터전에서 시작하는 기운으로, 이동·이사·독립·새 출발을 뜻합니다.',
+    '년살':'도화살이라고도 하며 매력·인기·이성 인연을 뜻하지만 유혹에도 유의합니다.',
+    '월살':'막히고 마르는 기운으로, 일이 더디거나 정체되기 쉬운 자리입니다.',
+    '망신살':'체면이 손상되거나 구설이 생기기 쉬운 기운이며, 드러내는 재주로도 봅니다.',
+    '장성살':'우두머리·리더의 기운으로, 권위와 추진력이 있고 조직을 이끄는 힘입니다.',
+    '반안살':'안장에 오른다는 뜻으로, 안정과 승진·명예를 얻는 기운입니다.',
+    '역마살':'이동과 변화의 기운으로, 여행·이사·해외·직업 이동이 잦음을 뜻합니다.',
+    '육해살':'잔병이나 은근한 방해로, 오래 이어지는 소소한 시달림을 뜻합니다.',
+    '화개살':'예술·종교·학문·고독의 기운으로, 정신세계와 재능이 깊습니다.',
+    '천을귀인':'가장 대표적인 길신으로, 어려울 때 귀인의 도움을 받는 기운입니다.',
+    '문창귀인':'학문·글재주·문서·시험에 이로운 귀인입니다.',
+    '암록':'겉으로 드러나지 않게 돕는 복록으로, 뜻밖의 도움이나 숨은 재물을 뜻합니다.',
+    '금여':'금으로 꾸민 수레로, 배우자 복과 안락한 생활을 뜻하는 귀인입니다.',
+    '공망':'그 자리의 기운이 비어 힘이 약해진다고 보는 표시로, 그 궁의 일이 허전하거나 기대에 못 미칠 수 있음을 뜻합니다.',
+    '괴강살':'성격이 강하고 결단력이 있으며 극단으로 흐르기 쉬운 일주로, 리더십과 고집이 함께 큽니다.',
+    '백호살':'갑작스러운 사고·부상·급변에 유의하라는 강한 기운이며, 추진력과 카리스마로도 봅니다.',
+    '양인살':'날카로운 칼날의 기운으로, 결단력과 승부욕이 세고 다툼·수술수에 유의합니다.',
+    '현침살':'바늘 끝처럼 날카로운 기운으로, 예민한 말투와 정밀한 손재주, 의료·기술·침 계통 적성을 뜻합니다.',
+    '월덕귀인':'태어난 달의 덕이 돕는 길신으로, 위기에서 화를 덜고 어려움이 순하게 풀리는 기운입니다.',
+    '천의성':'병을 고치는 별로, 건강 관리에 능하고 의료·간병·돌봄 분야와 인연이 있다고 봅니다.',
+    '천문성':'직관과 영적 감각이 뛰어난 별로, 역학·의학·종교·연구 계통 적성을 뜻합니다.'
+  };
+  function sinsalTipAttr(name){ const base=String(name).replace(/\(.*$/,''); const d=SINSAL_TIP[base]; return d ? ` data-tip="${escAttr(base+'\n'+d)}" style="cursor:help;"` : ''; }
+  function stageTipText(stage){ const d=STAGE_DETAIL[stage]; return d ? `${stage}(${d.hanja}) · ${d.cycle}\n${d.meaning}\n${d.trait}\n${d.note}` : ''; }
   function relItemHTML(r){
     const desc = REL_DESC[r.type] || (r.elem?`${r.elem} 기운의 국을 형성하여 해당 오행의 힘이 강해지는 조합입니다.`:'');
     const elemNote = r.elem ? ` (${r.elem} 기운)` : '';
@@ -1789,7 +1818,7 @@ window.__pip = (function(){
     } else {
       noteHtml += ` <span style="margin-left:10px;">· 격국(참고): ${gyeok.gyeokName} (${gyeok.note})</span>`;
     }
-    if(named.length) noteHtml += ` <span style="margin-left:10px;">· ${named.join(', ')}</span>`;
+    if(named.length) noteHtml += ` <span style="margin-left:10px;">· ${named.map(n=>`<span${sinsalTipAttr(n)} style="cursor:help;display:inline-block;padding:4px 3px;margin:-4px -3px;">${n}</span>`).join(', ')}</span>`;
     let noteEl=document.getElementById('sinsalNote');
     if(!noteEl){
       noteEl=document.createElement('div');
@@ -1859,9 +1888,9 @@ window.__pip = (function(){
     const stemGlyphHtml = isDayStem
       ? `<div class="glyph ilgan-btn" data-stem="${part.stem}" style="background:${sColor};cursor:pointer;box-shadow:inset 0 0 0 1px rgba(255,255,255,0.25), 0 0 0 2px var(--seal);">${STEM_HANJA[part.stem]}</div>`
       : `<div class="glyph" style="background:${sColor}">${STEM_HANJA[part.stem]}</div>`;
-    const gongmangHtml = extra && extra.isGongmang ? `<div class="gongmang-badge" style="margin-top:-4px;color:var(--seal);font-size:10.5px;">空亡</div>` : '';
-    const sinsalHtml = extra && extra.sinsal ? `<div class="sinsal12-tag" style="margin-top:2px;font-size:11px;color:var(--ink-soft);">${extra.sinsal}</div>` : '';
-    const gwiinHtml = extra && extra.gwiin && extra.gwiin.length ? `<div class="gwiin-tag" style="margin-top:2px;font-size:10.5px;color:var(--gold);">${extra.gwiin.join('·')}</div>` : '';
+    const gongmangHtml = extra && extra.isGongmang ? `<div class="gongmang-badge" data-tip="${escAttr('공망(空亡)\n'+SINSAL_TIP['공망'])}" style="margin-top:-4px;color:var(--seal);font-size:10.5px;cursor:help;">空亡</div>` : '';
+    const sinsalHtml = extra && extra.sinsal ? `<div class="sinsal12-tag" data-tip="${escAttr(extra.sinsal+'\n'+(SINSAL_TIP[extra.sinsal]||''))}" style="margin-top:2px;font-size:11px;color:var(--ink-soft);cursor:help;">${extra.sinsal}</div>` : '';
+    const gwiinHtml = extra && extra.gwiin && extra.gwiin.length ? `<div class="gwiin-tag" style="margin-top:2px;font-size:10.5px;color:var(--gold);">${extra.gwiin.map(n=>`<span${sinsalTipAttr(n)}>${n}</span>`).join('·')}</div>` : '';
     const tonggeunHtml = extra && extra.tonggeun ? `<div class="tonggeun-tag" data-tip="정 = 정기 (가장 튼튼)&#10;중 = 중기&#10;여 = 여기 (가장 약함)&#10;◎ = 음양까지 같은 글자에 뿌리&#10;여기에만 뿌리가 있으면 약한 통근" style="font-size:10px;color:var(--ink-soft);margin-top:-2px;cursor:help;">${extra.tonggeun}</div>` : '';
     return `<div class="pillar${extraClass?' '+extraClass:''}">
         <div class="tag">${tag}</div>
@@ -1874,7 +1903,7 @@ window.__pip = (function(){
         <div class="glyph small" style="background:${bColor}">${BRANCH_HANJA[part.branch]}</div>
         <div class="hangeul">${BRANCHES[part.branch]} · ${bElem} · ${branchYang?'陽':'陰'}</div>
         <div class="hidden-stems hidden-stems-btn" data-branch="${part.branch}" style="cursor:pointer;text-decoration:underline;text-decoration-style:dotted;">지장간 [${hidden}]</div>
-        <div class="stage-tag${stage?' stage-btn':''}" ${stage?`data-stage="${stage}" style="cursor:pointer;"`:''}>${stage}</div>
+        <div class="stage-tag${stage?' stage-btn':''}" ${stage?`data-stage="${stage}" data-tip-h="${escAttr(stageTipText(stage))}" style="cursor:pointer;"`:''}>${stage}</div>
         ${sinsalHtml}
         ${gwiinHtml}
         ${gongmangHtml}
