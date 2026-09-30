@@ -1435,14 +1435,21 @@ window.__pip = (function(){
       nature:'작은 불빛(정화)이 비나 이슬(계수)에 꺼지는 형상으로, 은근하지만 지속적인 소모전으로 봅니다.',
       personality:'예민함과 우울감에 유의해야 하며, 인간관계에서 감정을 소모하지 않도록 관리가 필요합니다.'}
   };
+  function escAttr(t){ return String(t).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+  // 마우스 설명 상자에 쓰는 형충회합 설명 (목록 항목의 한 줄 설명과 같은 문장)
+  function relTipText(r){
+    const desc = REL_DESC[r.type] || (r.elem?`${r.elem} 기운의 국을 형성하여 해당 오행의 힘이 강해지는 조합입니다.`:'');
+    const elemNote = r.elem ? ` (${r.elem} 기운)` : '';
+    return `${r.charName||r.type} (${r.pair.join(' · ')}) — ${r.type}${elemNote}\n${desc}`;
+  }
   function relItemHTML(r){
     const desc = REL_DESC[r.type] || (r.elem?`${r.elem} 기운의 국을 형성하여 해당 오행의 힘이 강해지는 조합입니다.`:'');
     const elemNote = r.elem ? ` (${r.elem} 기운)` : '';
     const detail = STEM_HAP_DETAIL[r.charName] || BRANCH_REL_DETAIL[r.charName] || (r.groupKey && SAMHAP_DETAIL[r.groupKey]);
     if(!detail){
-      return `<div class="rel-item"><b>${r.charName||r.type}</b> <span style="color:var(--ink-soft);font-size:12pt;">(${r.pair.join(' · ')})</span> — ${r.type}${elemNote}<br>${desc}</div>`;
+      return `<div class="rel-item" data-tip-h="${escAttr(relTipText(r))}"><b>${r.charName||r.type}</b> <span style="color:var(--ink-soft);font-size:12pt;">(${r.pair.join(' · ')})</span> — ${r.type}${elemNote}<br>${desc}</div>`;
     }
-    return `<div class="rel-item">
+    return `<div class="rel-item" data-tip-h="${escAttr(relTipText(r))}">
       <div class="rel-item-toggle" style="cursor:pointer;">
         <b>${r.charName}</b> <span style="color:var(--ink-soft);font-size:12pt;">(${r.pair.join(' · ')})</span> — ${r.type}${elemNote}
         <span class="rel-caret" style="float:right;color:var(--ink-soft);">▾</span>
@@ -1678,6 +1685,7 @@ window.__pip = (function(){
 
       let content='';
       items.forEach(({r,cols},i)=>{
+        const grpStart=content.length;
         const xs = cols.map(c=>{
           const occ=colSeen[c]||0; colSeen[c]=occ+1;
           const total=colTotal[c];
@@ -1709,6 +1717,10 @@ window.__pip = (function(){
           content += `<text x="${(xMin+xMax)/2}" y="${lineY+15}" font-size="12" fill="${lineColor}" text-anchor="middle" font-family="'Nanum Myeongjo',serif">${symbol}</text>`;
           if(elemChar) content += `<text x="${xMax+10}" y="${lineY+4}" font-size="12" fill="${lineColor}" font-family="'Nanum Myeongjo',serif">${elemChar}</text>`;
         }
+        // 선·점·기호를 한 묶음으로 만들고, 가는 선에도 마우스가 닿도록 보이지 않는 넓은 반응 영역(높이 24)을 둔다
+        const hitY = direction==='top' ? lineY-16 : lineY-8;
+        const hit = `<rect x="${xMin-8}" y="${hitY}" width="${xMax-xMin+16+(elemChar?16:0)}" height="24" fill="transparent"/>`;
+        content = content.slice(0,grpStart) + `<g data-tip="${escAttr(relTipText(r))}" pointer-events="all" style="cursor:help">` + content.slice(grpStart) + hit + '</g>';
       });
       svg.innerHTML=content;
     }
@@ -1850,7 +1862,7 @@ window.__pip = (function(){
     const gongmangHtml = extra && extra.isGongmang ? `<div class="gongmang-badge" style="margin-top:-4px;color:var(--seal);font-size:10.5px;">空亡</div>` : '';
     const sinsalHtml = extra && extra.sinsal ? `<div class="sinsal12-tag" style="margin-top:2px;font-size:11px;color:var(--ink-soft);">${extra.sinsal}</div>` : '';
     const gwiinHtml = extra && extra.gwiin && extra.gwiin.length ? `<div class="gwiin-tag" style="margin-top:2px;font-size:10.5px;color:var(--gold);">${extra.gwiin.join('·')}</div>` : '';
-    const tonggeunHtml = extra && extra.tonggeun ? `<div class="tonggeun-tag" title="정=정기(가장 튼튼) · 중=중기 · 여=여기(가장 약함) · ◎=음양까지 같은 글자에 뿌리. 여기에만 뿌리가 있으면 약한 통근" style="font-size:10px;color:var(--ink-soft);margin-top:-2px;">${extra.tonggeun}</div>` : '';
+    const tonggeunHtml = extra && extra.tonggeun ? `<div class="tonggeun-tag" data-tip="정 = 정기 (가장 튼튼)&#10;중 = 중기&#10;여 = 여기 (가장 약함)&#10;◎ = 음양까지 같은 글자에 뿌리&#10;여기에만 뿌리가 있으면 약한 통근" style="font-size:10px;color:var(--ink-soft);margin-top:-2px;cursor:help;">${extra.tonggeun}</div>` : '';
     return `<div class="pillar${extraClass?' '+extraClass:''}">
         <div class="tag">${tag}</div>
         ${stemTGHtml}
@@ -3390,6 +3402,7 @@ window.__pip = (function(){
     document.head.querySelectorAll('style, link[rel="stylesheet"]').forEach(n=>{ d.head.appendChild(n.cloneNode(true)); });
     const st=d.createElement('style'); st.textContent=PIP_CSS; d.head.appendChild(st);
     d.body.className='pip-body';
+    installTip(d);
     const box=d.createElement('div'); box.className='modal-box pip-box';
     // 상단 바: 패널 이름 + 메인으로 돌리기 버튼
     const bar=d.createElement('div'); bar.className='pip-bar';
@@ -3540,6 +3553,46 @@ window.__pip = (function(){
     new MutationObserver(updateCtxBtn).observe(modalOverlay,{attributes:true,attributeFilter:['class']});
     updateCtxBtn();
   })();
+
+  // ---- 마우스 설명 상자 (14pt). 컴퓨터는 올리면, 폰·태블릿은 누르면 뜬다 ----
+  function installTip(doc){
+    if(doc.__tipInstalled) return; doc.__tipInstalled=true;
+    const win=doc.defaultView||window;
+    const touch=!!(win.matchMedia && win.matchMedia('(hover: none)').matches);
+    let tip=null, cur=null;
+    const ensure=()=>{
+      if(tip && tip.isConnected) return tip;
+      tip=doc.createElement('div'); tip.className='ui-tip';
+      tip.style.cssText='position:fixed;z-index:100000;display:none;max-width:min(360px,calc(100vw - 16px));padding:10px 13px;border-radius:8px;background:#2d2a4a;color:#fff;font-size:14pt;line-height:1.55;white-space:pre-line;pointer-events:none;box-shadow:0 6px 20px rgba(0,0,0,.28);text-align:left;font-weight:400;';
+      doc.body.appendChild(tip); return tip;
+    };
+    const place=(x,y)=>{
+      const t=ensure(), tw=t.offsetWidth, th=t.offsetHeight, vw=win.innerWidth, vh=win.innerHeight;
+      let left=Math.max(8, Math.min(x-tw/2, vw-tw-8));
+      let top=y+18; if(top+th>vh-8) top=Math.max(8, y-th-14);
+      t.style.left=left+'px'; t.style.top=top+'px';
+    };
+    const show=(el,x,y)=>{
+      const text=el.getAttribute('data-tip')||el.getAttribute('data-tip-h'); if(!text) return;
+      const t=ensure(); t.textContent=text; t.style.display='block'; cur=el; place(x,y);
+    };
+    const hide=()=>{ if(tip) tip.style.display='none'; cur=null; };
+    const find=(e,sel)=>{ const t=e.target; return (t && t.closest) ? t.closest(sel) : null; };
+    if(!touch){
+      doc.addEventListener('mouseover',(e)=>{ const el=find(e,'[data-tip],[data-tip-h]'); if(el){ if(el!==cur) show(el,e.clientX,e.clientY); } else if(cur) hide(); });
+      doc.addEventListener('mousemove',(e)=>{ if(cur && tip && tip.style.display==='block') place(e.clientX,e.clientY); });
+      doc.addEventListener('mouseout',(e)=>{ if(cur && !(e.relatedTarget && cur.contains && cur.contains(e.relatedTarget))) hide(); });
+    } else {
+      // 폰: [data-tip] 는 눌러서 열고 다시 누르거나 다른 곳을 누르면 닫는다 (형충회합 목록 항목은 기존처럼 눌러서 펼침)
+      EventTarget.prototype.addEventListener.call(doc,'click',(e)=>{
+        const el=find(e,'[data-tip]');
+        if(el){ if(cur===el) hide(); else show(el,e.clientX,e.clientY); } else hide();
+      });
+    }
+    doc.addEventListener('scroll',hide,true);
+    win.addEventListener('resize',hide);
+  }
+  installTip(document);
 
   // ---- 소스 보기 ----
   // ---- 저장된 사주 목록 ----
