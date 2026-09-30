@@ -1512,7 +1512,7 @@ window.__pip = (function(){
   document.addEventListener('click',(e)=>{
     const btn = e.target.closest('.hidden-stems-btn');
     if(!btn || !state) return;
-    openHiddenStemsDetail(+btn.dataset.branch);
+    openHiddenStemsDetail(+btn.dataset.branch, btn.dataset.monthpillar==='1');
   });
   document.addEventListener('click',(e)=>{
     const btn = e.target.closest('.tengod-btn');
@@ -1625,18 +1625,24 @@ window.__pip = (function(){
       <p style="font-size:12px;color:var(--ink-soft);">※ 육친·과다/부족 해석은 전통 명리학의 일반적인 관법이며, 실제 가족관계나 개인 상황과 반드시 일치하지는 않습니다.</p>
     `;
   }
-  function openHiddenStemsDetail(branchIdx){
+  function openHiddenStemsDetail(branchIdx, isMonthPillar){
     rememberReturnPanel();
     document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
     document.querySelectorAll('.reading-panel').forEach(p=>p.classList.remove('show'));
     const panel=document.getElementById('panel-hidden');
     panel.classList.add('show');
-    renderHiddenStemsDetail(branchIdx);
+    renderHiddenStemsDetail(branchIdx, isMonthPillar);
     modalOverlay.classList.add('open');
     document.body.style.overflow='hidden';
     modalOverlay.querySelector('.modal-scroll').scrollTop=0;
   }
-  function renderHiddenStemsDetail(branchIdx){
+  // 지장간 구성 요약: 丁 9일 · 乙 3일 · 己 18일 (합 30일)  — 격국 판정에 쓰는 월률분야 일수와 같은 표
+  function hiddenDaysSummary(branchIdx){
+    const chars=HIDDEN[branchIdx], days=monthRuleDays(branchIdx);
+    if(!days) return '';
+    return chars.map((h,i)=>`${h} ${days[i]}일`).join(' · ')+` (합 ${days.reduce((a,b)=>a+b,0)}일)`;
+  }
+  function renderHiddenStemsDetail(branchIdx, isMonthPillar){
     const dayStemIdx = state.dayStemIdx;
     const chars = HIDDEN[branchIdx];
     const posNames = chars.length===3 ? ['여기(초기)','중기','정기(본기)'] : chars.length===2 ? ['여기(초기)','정기(본기)'] : ['정기(본기)'];
@@ -1645,13 +1651,25 @@ window.__pip = (function(){
       const elem = STEM_ELEM[stemIdx];
       const yy = stemIdx%2===0?'陽':'陰';
       const tg = tenGod(dayStemIdx, elem, stemIdx%2===0);
+      const dayCount = monthRuleDays(branchIdx) ? ` · <b>${monthRuleDays(branchIdx)[i]}일</b>` : '';
       return `<div class="rel-item">
-        <b>${posNames[i]}</b> — ${hanja}(${STEMS[stemIdx]}) · ${elem}(${yy})
+        <b>${posNames[i]}</b> — ${hanja}(${STEMS[stemIdx]}) · ${elem}(${yy})${dayCount}
         <br>일간 기준 십신: <b style="color:var(--seal);">${tg}</b> — ${TENGOD_DESC[tg]}
       </div>`;
     }).join('');
+    // 태어난 달의 지지(월지)에서 연 경우에만: 절입 후 며칠째이고 지금 다스리는 지장간(사령)이 무엇인지
+    let sajeongLine='';
+    if(isMonthPillar && state && state.s){
+      const sj=sajeongForMonth(state.s);
+      if(sj && sj.elapsedDays!==null && sj.elapsedDays!==undefined){
+        sajeongLine = `<p>태어난 날은 절입 후 약 <b>${sj.elapsedDays}일</b>이 지난 때이고, 지금 다스리는 지장간(사령)은 <b style="color:var(--seal);">${chars[sj.idx]}(${posNames[sj.idx].replace(/\(.*\)/,'')})</b>입니다.</p>`;
+      }
+    }
+    const summary = hiddenDaysSummary(branchIdx);
     document.getElementById('panel-hidden').innerHTML = `
       <h4>지장간 (支藏干) — ${BRANCH_HANJA[branchIdx]}(${BRANCHES[branchIdx]})</h4>
+      ${summary ? `<p><b>지장간 구성:</b> ${summary}</p>` : ''}
+      ${sajeongLine}
       <p>지지 하나에는 겉으로 드러난 오행 외에, 그 속에 여러 천간의 기운이 함께 숨어 있다고 봅니다. 이를 지장간이라 하며, 시간의 흐름에 따라 세력이 옮겨가는 <b>여기(초기)</b>·<b>중기</b>·<b>정기(본기)</b>로 나뉩니다. 이 중 정기가 그 지지를 대표하는 가장 강한 기운이며, 사주 해석 시 통근(通根) 여부를 판단하는 기준이 되기도 합니다. 원국의 "통근" 표시에서 <b>정</b>은 정기, <b>중</b>은 중기, <b>여</b>는 여기에 뿌리를 둔 것이고 <b>◎</b>는 음양까지 같은 글자에 뿌리를 둔 경우입니다. 정기의 뿌리가 가장 튼튼하고 여기만 있으면 "약한 통근"으로 봅니다.</p>
       ${rows}
     `;
@@ -1915,7 +1933,7 @@ window.__pip = (function(){
         ${branchTGHtml}
         <div class="glyph small" style="background:${bColor}">${BRANCH_HANJA[part.branch]}</div>
         <div class="hangeul">${BRANCHES[part.branch]} · ${bElem} · ${branchYang?'陽':'陰'}</div>
-        <div class="hidden-stems hidden-stems-btn" data-branch="${part.branch}" style="cursor:pointer;text-decoration:underline;text-decoration-style:dotted;">지장간 [${hidden}]</div>
+        <div class="hidden-stems hidden-stems-btn" data-branch="${part.branch}"${tag.indexOf('월주')===0?' data-monthpillar="1"':''} data-tip-h="${escAttr('지장간 구성\n'+hiddenDaysSummary(part.branch))}" style="cursor:pointer;text-decoration:underline;text-decoration-style:dotted;">지장간 [${hidden}]</div>
         <div class="stage-tag${stage?' stage-btn':''}" ${stage?`data-stage="${stage}" data-tip-h="${escAttr(stageTipText(stage))}" style="cursor:pointer;"`:''}>${stage}</div>
         ${sinsalHtml}
         ${gwiinHtml}
