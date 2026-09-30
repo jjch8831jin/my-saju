@@ -1890,7 +1890,11 @@ window.__pip = (function(){
     const stemYang = part.stem%2===0, branchYang = part.branch%2===0; // branchYang은 화면 표기용(陽/陰), 십신은 정기 기준(BRANCH_YANG)
     const stemTG = isDayStem ? '' : tenGod(dayStemIdx, sElem, stemYang);
     const branchTG = tenGod(dayStemIdx, bElem, BRANCH_YANG[part.branch]);
-    const stemTGHtml = stemTG ? `<div class="tenGod tengod-btn" data-tg="${stemTG}" style="cursor:pointer;text-decoration:underline;text-decoration-style:dotted;">${stemTG}</div>` : `<div class="tenGod">&nbsp;</div>`;
+    // 일간은 십신이 없어서 비어 있는 자리 — 삼재인 해에는 여기에 삼재 이름을 붉게 보여 준다 (기준 해: 세운 연도를 골랐으면 그 해, 아니면 올해)
+    const sjTop = (isDayStem && state && state.s) ? samjaeInfo(state.s.year.branch, selectedSwYear!=null ? selectedSwYear : new Date().getFullYear()) : null;
+    const stemTGHtml = stemTG
+      ? `<div class="tenGod tengod-btn" data-tg="${stemTG}" style="cursor:pointer;text-decoration:underline;text-decoration-style:dotted;">${stemTG}</div>`
+      : (sjTop ? `<div class="tenGod samjae-top" data-tip="${escAttr(samjaeTipText(sjTop))}" style="color:var(--seal);font-weight:700;cursor:help;">${sjTop.label.replace(/\(.*\)/,'')}</div>` : `<div class="tenGod">&nbsp;</div>`);
     const branchTGHtml = branchTG ? `<div class="tenGod tengod-btn" data-tg="${branchTG}" style="cursor:pointer;text-decoration:underline;text-decoration-style:dotted;">${branchTG}</div>` : `<div class="tenGod">&nbsp;</div>`;
     const stage = hasTime===false && tag.indexOf('시')===0 ? '' : twelveStage(dayStemIdx, part.branch);
     const hidden = HIDDEN[part.branch].join(',');
