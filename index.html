@@ -1469,6 +1469,13 @@ window.__pip = (function(){
     '천의성':'병을 고치는 별로, 건강 관리에 능하고 의료·간병·돌봄 분야와 인연이 있다고 봅니다.',
     '천문성':'직관과 영적 감각이 뛰어난 별로, 역학·의학·종교·연구 계통 적성을 뜻합니다.'
   };
+  const SAMJAE_TIP={
+    '일반':'삼재(三災)\n태어난 띠를 기준으로 12년마다 3년씩 이어지는 조심해야 할 시기입니다. 들삼재·눌삼재·날삼재로 나뉩니다.',
+    '들삼재':'들삼재(입삼재)\n삼재가 들어오는 첫 해로, 변화와 불안이 시작되는 시기입니다. 무리한 확장보다 준비와 점검을 권합니다.',
+    '눌삼재':'눌삼재(침삼재)\n삼재가 머무는 가운데 해로, 가장 조심해야 하는 시기로 봅니다. 건강·구설·계약에 신중하라는 뜻입니다.',
+    '날삼재':'날삼재(출삼재)\n삼재가 나가는 마지막 해로, 어려움이 서서히 풀려 가는 시기입니다. 마무리를 잘하는 것이 중요합니다.'
+  };
+  function samjaeTipText(info){ return info ? (SAMJAE_TIP[info.label.replace(/\(.*\)/,'')]||SAMJAE_TIP['일반']) : SAMJAE_TIP['일반']; }
   function sinsalTipAttr(name){ const base=String(name).replace(/\(.*$/,''); const d=SINSAL_TIP[base]; return d ? ` data-tip="${escAttr(base+'\n'+d)}" style="cursor:help;"` : ''; }
   function stageTipText(stage){ const d=STAGE_DETAIL[stage]; return d ? `${stage}(${d.hanja}) · ${d.cycle}\n${d.meaning}\n${d.trait}\n${d.note}` : ''; }
   function relItemHTML(r){
@@ -1764,7 +1771,9 @@ window.__pip = (function(){
     if(!state) return cols;
     if(selectedSwYear!=null){
       const idx=mod(selectedSwYear-4,60), stem=mod(idx,10), branch=mod(idx,12);
-      cols.push({key:'세운', tag:`세운 · ${selectedSwYear}년`, part:{stem,branch}});
+      const sj=samjaeInfo(state.s.year.branch, selectedSwYear);
+      const sjHtml = sj ? `<div class="samjae-mini" data-tip="${escAttr(samjaeTipText(sj))}" style="margin-top:6px;font-size:12px;font-weight:700;color:var(--seal);cursor:help;">${sj.label.replace(/\(.*\)/,'')}</div>` : '';
+      cols.push({key:'세운', tag:`세운 · ${selectedSwYear}년`, part:{stem,branch}, samjaeHtml:sjHtml});
     }
     if(selectedDwIdx!=null && state.dw){
       const item=state.dw.list[selectedDwIdx];
@@ -1793,7 +1802,7 @@ window.__pip = (function(){
     });
     const mkExtra=(branch, stemLabel)=>({ isGongmang: gongmang.includes(branch), sinsal: sinsalMap[branch], gwiin: gwiinMap[branch], tonggeun: stemLabel?tonggeunByLabel[stemLabel]:null });
     let html='';
-    extra.forEach(c=>{ html+=pillarHTML(c.tag, c.part, dayStemIdx, false, true, 'extra-col'); });
+    extra.forEach(c=>{ html+=pillarHTML(c.tag, c.part, dayStemIdx, false, true, 'extra-col', c.samjaeHtml ? {samjaeHtml:c.samjaeHtml} : undefined); });
     html+=pillarHTML('시주 · 時柱', s.hour, dayStemIdx, false, hasTime, undefined, s.hour?mkExtra(s.hour.branch,'시간'):undefined);
     html+=pillarHTML('일주 · 日柱', s.day, dayStemIdx, true, true, undefined, mkExtra(s.day.branch,'일간'));
     html+=pillarHTML('월주 · 月柱', s.month, dayStemIdx, false, true, undefined, mkExtra(s.month.branch,'월간'));
@@ -1907,6 +1916,7 @@ window.__pip = (function(){
         ${sinsalHtml}
         ${gwiinHtml}
         ${gongmangHtml}
+        ${extra && extra.samjaeHtml ? extra.samjaeHtml : ''}
       </div>`;
   }
 
@@ -4205,9 +4215,17 @@ window.__pip = (function(){
       monthRows += `<div class="date-item" style="${boxStyle}"><div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:6px;"><span>${m}월${isCur?' (이번 달)':''} · ${STEM_HANJA[ms.stem]}${BRANCH_HANJA[ms.branch]}(${STEMS[ms.stem]}${BRANCHES[ms.branch]})</span><span class="dtag"${tagStyle}>천간 ${stemTgHtml} · 지지 ${branchTgHtml}</span></div>${descHtml}${relHtml}</div>`;
     }
     const samjae=samjaeInfo(s.year.branch, nowYear);
-    const samjaeHtml = samjae
-      ? `<p style="font-size:12.5px;color:var(--seal);">삼재(三災): <b>${samjae.label}</b>에 해당합니다.</p>`
-      : `<p style="font-size:12.5px;color:var(--ink-soft);">삼재(三災): 올해는 삼재에 해당하지 않습니다.</p>`;
+    const samjaeLine=(title, info, noText)=>{
+      const tip=escAttr(samjaeTipText(info));
+      return info
+        ? `<p class="samjae-line" data-tip="${tip}" style="font-size:16pt !important;color:var(--seal);cursor:help;">${title}: <b>${info.label}</b>에 해당합니다.</p>`
+        : `<p class="samjae-line" data-tip="${tip}" style="font-size:16pt !important;color:var(--ink-soft);cursor:help;">${title}: ${noText}</p>`;
+    };
+    let samjaeHtml = samjaeLine('삼재(三災)', samjae, '올해는 삼재에 해당하지 않습니다.');
+    // 세운 연도 화살표(또는 목록)로 올해가 아닌 해를 골랐다면 그 해의 삼재도 함께 보여 준다
+    if(selectedSwYear!=null && selectedSwYear!==nowYear){
+      samjaeHtml += samjaeLine('삼재(三災) · '+selectedSwYear+'년', samjaeInfo(s.year.branch, selectedSwYear), '이 해는 삼재에 해당하지 않습니다.');
+    }
     document.getElementById('panel-fortune').innerHTML = `
       <h4>${nowYear}년 운세</h4>
       <p>${nowYear}년의 해운(歲運)은 <b>${STEM_HANJA[stem]}${BRANCH_HANJA[branch]}(${STEMS[stem]}${BRANCHES[branch]})</b>, 일간을 기준으로 한 십신은 천간 <b>${tg}</b> · 지지 <b>${branchTg}</b>입니다.</p>
