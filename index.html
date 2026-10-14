@@ -5184,7 +5184,7 @@ window.__pip = (function(){
       <h4>🌙 꿈해몽</h4>
       <p style="font-size:12.5px;color:var(--ink-soft);">꾼 꿈을 최대한 자세히 적어 보세요. 누가 나왔는지, 어디였는지, 어떤 일이 있었는지, 꿈 속 기분은 어땠는지가 풀이에 도움이 돼요. 사주와 상관없이 꿈 이야기만으로 풀이합니다.</p>
       <div class="voice-input-wrap">
-        <textarea id="dreamInput" rows="5" placeholder="예: 큰 구렁이가 물속에서 나와 내 몸을 감았는데 무섭지는 않았다..." style="width:100%; font-family:inherit; font-size:14pt; padding:9px 10px; border:1px solid var(--rule); border-radius:8px; background:#fffdf7; box-sizing:border-box;"></textarea>
+        <textarea id="dreamInput" rows="5" placeholder="예: 큰 구렁이가 물속에서 나와 내 몸을 감았는데 무섭지는 않았다..." style="width:100%; font-family:inherit; font-size:14pt; padding:9px 10px; border:1px solid var(--rule); border-radius:8px; background:#fffdf7; box-sizing:border-box; min-height:130px; max-height:40vh; resize:vertical;"></textarea>
         <button type="button" class="mic-btn" id="micDreamInput" title="음성으로 입력">🎤</button>
       </div>
       <div class="mic-err" id="micErrDreamInput"></div>
@@ -5210,7 +5210,7 @@ window.__pip = (function(){
     const ta=document.getElementById('dreamInput');
     ta.value=dreamDraft;
     ta.addEventListener('input',()=>{ dreamDraft=ta.value; });
-    wireAutoGrow(ta);
+    wireAutoGrow(ta); setTimeout(()=>autoGrow(ta),60);
     attachVoiceInput('dreamInput','micDreamInput','micErrDreamInput');
     document.getElementById('dreamGoBtn').addEventListener('click', ()=>{
       stopMicIfRecording('micDreamInput');
