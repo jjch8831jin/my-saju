@@ -3331,7 +3331,7 @@ window.__pip = (function(){
     if(btn) btn.classList.add('active');
     const panel=document.getElementById('panel-'+tab);
     if(panel) panel.classList.add('show');
-    modalOverlay.classList.toggle('fullscreen', tab==='qna');
+    modalOverlay.classList.toggle('fullscreen', tab==='qna' || tab==='dream');
     renderTab(tab);
     modalOverlay.classList.add('open');
     document.body.style.overflow='hidden';
@@ -3355,7 +3355,7 @@ window.__pip = (function(){
       const tabName=targetId.replace('panel-','');
       const tabBtn=document.querySelector('.tab-btn[data-tab="'+tabName+'"]');
       if(tabBtn) tabBtn.classList.add('active');
-      modalOverlay.classList.toggle('fullscreen', targetId==='panel-qna');
+      modalOverlay.classList.toggle('fullscreen', targetId==='panel-qna' || targetId==='panel-dream');
       modalOverlay.querySelector('.modal-scroll').scrollTop=scrollTop;
       return;
     }
@@ -3408,7 +3408,7 @@ window.__pip = (function(){
     const tabName=item.panelId.replace('panel-','');
     const tabBtn=document.querySelector('.tab-btn[data-tab="'+tabName+'"]');
     if(tabBtn) tabBtn.classList.add('active');
-    modalOverlay.classList.toggle('fullscreen', item.panelId==='panel-qna');
+    modalOverlay.classList.toggle('fullscreen', item.panelId==='panel-qna' || item.panelId==='panel-dream');
     modalOverlay.classList.add('open');
     document.body.style.overflow='hidden';
     modalOverlay.querySelector('.modal-scroll').scrollTop=item.scrollTop;
@@ -3527,7 +3527,7 @@ window.__pip = (function(){
     const tb=document.querySelector('.tab-btn[data-tab="'+tab+'"]'); if(tb) tb.classList.add('active');
     const panel=document.getElementById(id); if(panel) panel.classList.add('show');
     if(window.__resetModalPosition) window.__resetModalPosition();
-    modalOverlay.classList.toggle('fullscreen', tab==='qna');
+    modalOverlay.classList.toggle('fullscreen', tab==='qna' || tab==='dream');
     modalOverlay.classList.add('open');
     document.body.style.overflow='hidden';
     if(tab==='qna') setTimeout(()=>{ const sc=getModalScroll(); if(sc) sc.scrollTop=sc.scrollHeight; }, 30);
@@ -4045,7 +4045,7 @@ window.__pip = (function(){
         document.querySelectorAll('.reading-panel').forEach(p=>p.classList.remove('show'));
         btn.classList.add('active');
         document.getElementById('panel-'+tab).classList.add('show');
-        modalOverlay.classList.toggle('fullscreen', tab==='qna');
+        modalOverlay.classList.toggle('fullscreen', tab==='qna' || tab==='dream');
         renderTab(tab);
       } else {
         openModal(tab);
@@ -5177,65 +5177,95 @@ window.__pip = (function(){
   }
   let dreamDraft='';
   let dreamSyms=[];
+  let dreamView='dict';
+  const dreamOut={dict:'', kw:'', ai:'', aiFor:'', link:'', linkFor:''};
+  function dreamText(){ const t=document.getElementById('dreamInput'); return t ? (t.value||'').trim() : dreamDraft.trim(); }
   function renderDream(){
     const panel=document.getElementById('panel-dream');
-    const canLink=!!state;
     panel.innerHTML=`
-      <h4>🌙 꿈해몽</h4>
-      <p style="font-size:12.5px;color:var(--ink-soft);">꾼 꿈을 최대한 자세히 적어 보세요. 누가 나왔는지, 어디였는지, 어떤 일이 있었는지, 꿈 속 기분은 어땠는지가 풀이에 도움이 돼요. 사주와 상관없이 꿈 이야기만으로 풀이합니다.</p>
+      <style>
+        #panel-dream .dm-btn{ flex:1 1 auto; font-family:inherit; font-size:14px; font-weight:700; padding:8px 14px; border-radius:9px; border:1px solid var(--rule); background:#fffdf7; color:var(--ink); cursor:pointer; }
+        #panel-dream .dm-btn.on{ background:var(--ink); color:var(--paper); border-color:var(--ink); }
+        #panel-dream .dm-sub{ flex:none; font-size:12px; padding:6px 12px; margin-top:10px; }
+      </style>
+      <div style="position:sticky; top:-1px; z-index:5; background:var(--paper); padding:2px 0 10px; border-bottom:1px solid var(--rule); margin-bottom:12px;">
+        <h4 style="margin:0 0 8px;">🌙 꿈해몽</h4>
+        <div class="dm-menu" style="display:flex; gap:6px; flex-wrap:wrap;">
+          <button type="button" class="dm-btn" data-dv="dict">꿈해몽하기</button>
+          <button type="button" class="dm-btn" data-dv="ai">✨ AI 심층 풀이</button>
+          <button type="button" class="dm-btn" data-dv="link">🔮 내 사주로 꿈풀이하기</button>
+        </div>
+      </div>
+      <p style="font-size:12.5px;color:var(--ink-soft);margin-top:0;">꾼 꿈을 최대한 자세히 적어 보세요. 누가 나왔는지, 어디였는지, 어떤 일이 있었는지, 꿈 속 기분은 어땠는지가 풀이에 도움이 돼요.</p>
       <div class="voice-input-wrap">
         <textarea id="dreamInput" rows="5" placeholder="예: 큰 구렁이가 물속에서 나와 내 몸을 감았는데 무섭지는 않았다..." style="width:100%; font-family:inherit; font-size:14pt; padding:9px 10px; border:1px solid var(--rule); border-radius:8px; background:#fffdf7; box-sizing:border-box; min-height:130px; max-height:40vh; resize:vertical;"></textarea>
         <button type="button" class="mic-btn" id="micDreamInput" title="음성으로 입력">🎤</button>
       </div>
       <div class="mic-err" id="micErrDreamInput"></div>
-      <button class="go-btn" id="dreamGoBtn" style="margin-top:10px;">해몽하기</button>
-      <div class="ai-error" id="dreamNone"></div>
-      <div id="dreamResult" style="display:none;">
+
+      <div id="dreamV-dict">
+        <button class="go-btn" id="dreamGoBtn" style="margin-top:10px;">해몽하기</button>
+        <div class="ai-error" id="dreamNone"></div>
         <div id="dreamKw" style="margin-top:14px;"></div>
         <div class="ai-box" id="dreamDictBox"></div>
-        <div style="margin-top:12px;">
-          <button class="ai-btn" id="dreamAiBtn" style="margin-top:0;">✨ AI 심층 풀이 (꿈 전체 이야기를 엮어서 해석)</button>
-          <div class="ai-loading" id="dreamAiLoading">AI가 꿈 이야기를 풀이하고 있어요...</div>
-          <div class="ai-error" id="dreamAiError"></div>
-          <div class="ai-box" id="dreamAiBox"></div>
-        </div>
-        ${canLink ? `<div style="margin-top:12px;">
-          <button class="ai-btn" id="dreamLinkBtn" style="margin-top:0; background:var(--seal); border-color:var(--seal);">🔮 내 사주로 다시 보기</button>
-          <div class="ai-loading" id="dreamLinkLoading">AI가 내 사주와 꿈을 함께 풀이하고 있어요...</div>
-          <div class="ai-error" id="dreamLinkError"></div>
-          <div class="ai-box" id="dreamLinkBox"></div>
-        </div>` : ''}
-        <p style="font-size:11.5px;color:var(--ink-soft);margin-top:14px;">※ 전통·상징에 바탕한 해석이며, 꿈이 실제로 맞는지 틀리는지를 말해 주는 것은 아닙니다. 재미와 마음 돌아보기의 참고로만 봐 주세요.</p>
-      </div>`;
+      </div>
+      <div id="dreamV-ai" style="display:none;">
+        <div class="ai-loading" id="dreamAiLoading">AI가 꿈 이야기를 풀이하고 있어요...</div>
+        <div class="ai-error" id="dreamAiError"></div>
+        <div class="ai-box" id="dreamAiBox"></div>
+        <button type="button" class="dm-btn dm-sub" id="dreamAiRe">다시 풀이하기</button>
+      </div>
+      <div id="dreamV-link" style="display:none;">
+        <div class="ai-loading" id="dreamLinkLoading">AI가 내 사주와 꿈을 함께 풀이하고 있어요...</div>
+        <div class="ai-error" id="dreamLinkError"></div>
+        <div class="ai-box" id="dreamLinkBox"></div>
+        <button type="button" class="dm-btn dm-sub" id="dreamLinkRe">다시 풀이하기</button>
+      </div>
+      <p style="font-size:11.5px;color:var(--ink-soft);margin-top:14px;">※ 전통·상징에 바탕한 해석이며, 꿈이 실제로 맞는지 틀리는지를 말해 주는 것은 아닙니다. 재미와 마음 돌아보기의 참고로만 봐 주세요.</p>`;
     const ta=document.getElementById('dreamInput');
     ta.value=dreamDraft;
     ta.addEventListener('input',()=>{ dreamDraft=ta.value; });
     wireAutoGrow(ta); setTimeout(()=>autoGrow(ta),60);
     attachVoiceInput('dreamInput','micDreamInput','micErrDreamInput');
-    document.getElementById('dreamGoBtn').addEventListener('click', ()=>{
-      stopMicIfRecording('micDreamInput');
-      dreamDraft=ta.value;
-      const text=ta.value.trim();
-      const none=document.getElementById('dreamNone'), res=document.getElementById('dreamResult');
-      none.classList.remove('show'); none.textContent='';
-      if(!text){ none.textContent='꿈 내용을 먼저 적어 주세요.'; none.classList.add('show'); res.style.display='none'; return; }
-      dreamSyms=findDreamSymbols(text);
-      res.style.display='block';
-      ['dreamAiBox','dreamLinkBox'].forEach(id=>{ const b=document.getElementById(id); if(b){ b.classList.remove('show'); b.textContent=''; hideShareBar(b); } });
-      ['dreamAiError','dreamLinkError'].forEach(id=>{ const b=document.getElementById(id); if(b){ b.classList.remove('show'); b.textContent=''; } });
-      const kw=document.getElementById('dreamKw'), box=document.getElementById('dreamDictBox');
-      if(dreamSyms.length){
-        kw.innerHTML='<span style="font-size:12.5px;color:var(--ink-soft);margin-right:6px;">찾은 상징</span>'+dreamSyms.map(x=>`<span class="stage-tag" style="font-size:12px;margin:0 4px 4px 0;padding:2px 9px;">${escapeHtml(x.name)}</span>`).join('');
-        box.textContent=dreamSyms.map(x=>`■ ${x.name}\n${x.desc}`).join('\n\n');
-      } else {
-        kw.innerHTML='';
-        box.textContent='사전에서 딱 맞는 상징을 찾지 못했어요. 아래 "AI 심층 풀이"를 누르면 꿈 이야기 전체를 보고 풀이해 드려요.';
-      }
-      box.classList.add('show');
-      if(dreamSyms.length) showShareBar(box); else hideShareBar(box);
+    // 이전에 만든 결과가 있으면 그대로 복원
+    const kw=document.getElementById('dreamKw'), dbox=document.getElementById('dreamDictBox');
+    kw.innerHTML=dreamOut.kw;
+    if(dreamOut.dict){ dbox.textContent=dreamOut.dict; dbox.classList.add('show'); if(dreamSyms.length) showShareBar(dbox); }
+    [['ai','dreamAiBox'],['link','dreamLinkBox']].forEach(([k,id])=>{
+      const b=document.getElementById(id);
+      if(dreamOut[k]){ b.textContent=dreamOut[k]; b.classList.add('show'); showShareBar(b); }
     });
-    wireAI('dreamAiBtn','dreamAiLoading','dreamAiError','dreamAiBox', buildDreamPrompt);
-    if(canLink) wireDreamLink();
+    document.getElementById('dreamGoBtn').addEventListener('click', doDreamDict);
+    document.getElementById('dreamAiRe').addEventListener('click', ()=>runDreamAI('ai',true));
+    document.getElementById('dreamLinkRe').addEventListener('click', ()=>runDreamAI('link',true));
+    panel.querySelectorAll('[data-dv]').forEach(b=>b.addEventListener('click', ()=>showDreamView(b.dataset.dv, true)));
+    showDreamView(dreamView, false);
+  }
+  function showDreamView(v, auto){
+    dreamView=v;
+    ['dict','ai','link'].forEach(k=>{
+      const el=document.getElementById('dreamV-'+k); if(el) el.style.display = (k===v) ? 'block' : 'none';
+    });
+    document.querySelectorAll('#panel-dream [data-dv]').forEach(b=>b.classList.toggle('on', b.dataset.dv===v));
+    if(auto && (v==='ai'||v==='link')) runDreamAI(v,false);
+  }
+  function doDreamDict(){
+    stopMicIfRecording('micDreamInput');
+    const text=dreamText(); dreamDraft=text;
+    const none=document.getElementById('dreamNone');
+    none.classList.remove('show'); none.textContent='';
+    if(!text){ none.textContent='꿈 내용을 먼저 적어 주세요.'; none.classList.add('show'); return; }
+    dreamSyms=findDreamSymbols(text);
+    const kw=document.getElementById('dreamKw'), box=document.getElementById('dreamDictBox');
+    if(dreamSyms.length){
+      dreamOut.kw='<span style="font-size:12.5px;color:var(--ink-soft);margin-right:6px;">찾은 상징</span>'+dreamSyms.map(x=>`<span class="stage-tag" style="font-size:12px;margin:0 4px 4px 0;padding:2px 9px;">${escapeHtml(x.name)}</span>`).join('');
+      dreamOut.dict=dreamSyms.map(x=>`■ ${x.name}\n${x.desc}`).join('\n\n');
+    } else {
+      dreamOut.kw='';
+      dreamOut.dict='사전에서 딱 맞는 상징을 찾지 못했어요. 위 메뉴의 "✨ AI 심층 풀이"를 누르면 꿈 이야기 전체를 보고 풀이해 드려요.';
+    }
+    kw.innerHTML=dreamOut.kw; box.textContent=dreamOut.dict; box.classList.add('show');
+    if(dreamSyms.length) showShareBar(box); else hideShareBar(box);
   }
   function dreamSymLines(){
     return dreamSyms.length ? dreamSyms.map(x=>`- ${x.name}: ${x.desc}`).join('\n') : '(사전에서 찾은 상징 없음 — 꿈 이야기에서 직접 상징을 뽑아 풀이해줘)';
@@ -5263,38 +5293,48 @@ window.__pip = (function(){
     });
     return lines.join('\n');
   }
-  function wireDreamLink(){
-    const btn=document.getElementById('dreamLinkBtn'), loading=document.getElementById('dreamLinkLoading');
-    const err=document.getElementById('dreamLinkError'), box=document.getElementById('dreamLinkBox');
-    let ctl=null;
-    const stop=document.createElement('button'); stop.type='button'; stop.className='ai-stop'; stop.textContent='중지';
-    stop.onclick=()=>{ if(ctl) ctl.abort(); };
-    loading.appendChild(stop);
-    btn.addEventListener('click', async ()=>{
-      if(!state) return;
-      const text=(document.getElementById('dreamInput').value||'').trim();
-      err.classList.remove('show'); err.textContent='';
-      const local=dreamLocalLink();
-      box.textContent=local; box.classList.toggle('show', !!local); hideShareBar(box);
-      ctl=new AbortController();
-      loading.classList.add('show'); btn.disabled=true; btn.textContent='불러오는 중...';
-      try{
+  const dreamCtl={ai:null, link:null};
+  async function runDreamAI(kind, force){
+    const isLink = kind==='link';
+    const cap = isLink ? 'Link' : 'Ai';
+    const loading=document.getElementById('dream'+cap+'Loading'), err=document.getElementById('dream'+cap+'Error'), box=document.getElementById('dream'+cap+'Box');
+    if(dreamCtl[kind]) return; // 이미 만드는 중
+    const text=dreamText();
+    err.classList.remove('show'); err.textContent='';
+    if(!text){ err.textContent='꿈 내용을 먼저 적어 주세요. (꿈해몽하기 메뉴에서 적을 수 있어요)'; err.classList.add('show'); return; }
+    if(isLink && !state){ err.textContent='먼저 첫 화면에서 사주를 계산해 주세요. 사주를 계산한 뒤에 내 사주로 꿈을 풀이할 수 있어요.'; err.classList.add('show'); return; }
+    dreamDraft=text;
+    const forKey=isLink?'linkFor':'aiFor';
+    if(!force && dreamOut[kind] && dreamOut[forKey]===text) return; // 같은 꿈이면 이미 나온 풀이를 그대로 보여준다
+    dreamSyms=findDreamSymbols(text);
+    let stop=loading.querySelector('.ai-stop');
+    const ctl=new AbortController(); dreamCtl[kind]=ctl;
+    if(!stop){ stop=document.createElement('button'); stop.type='button'; stop.className='ai-stop'; stop.textContent='중지'; loading.appendChild(stop); }
+    stop.onclick=()=>ctl.abort();
+    const local = isLink ? dreamLocalLink() : '';
+    box.classList.remove('show'); box.textContent=''; hideShareBar(box);
+    if(isLink && local){ box.textContent=local; box.classList.add('show'); }
+    loading.classList.add('show');
+    try{
+      let prompt;
+      if(isLink){
         const {s,dayStemIdx,isMale:im,counts,strength,ys,year,month,day}=state;
         const summary=buildSajuSummary(s,dayStemIdx,im,counts,strength,ys,year,month,day);
-        const prompt=`다음은 한 사람의 사주 정보입니다.\n\n${summary}\n\n[이 사람이 꾼 꿈]\n${text}\n\n[전통 해몽 사전에서 찾은 상징]\n${dreamSymLines()}\n\n이 사람의 사주와 꿈을 연결해서 풀이해줘. 위 [오늘 날짜]를 기준으로 '올해', '이번 달' 같은 시점을 해석해줘. [풀이 규칙] 1) 첫 문장에서 이 꿈이 이 사람의 사주 흐름에서 어떤 의미인지(좋은 쪽인지, 조심할 쪽인지, 마음이 반영된 꿈인지) 분명하게 먼저 말해줘. 2) 꿈의 상징을 오행으로 바꿔서(물=수, 불=화, 나무·꽃=목, 흙·집=토, 쇠·돈·칼=금 등), 이 사람 원국에서 부족하거나 넘치는 오행과 어떻게 대응하는지 풀어줘. 3) 꿈에 나온 재물·직장·사람·일과 관련된 십신(재성·관성·식상·인성·비겁)이 이 사람 원국에서 어떤 위치인지 짚어서 해석해줘. 4) 올해 세운과 이번 달 흐름이 꿈의 내용과 어떻게 맞닿는지 말해줘. 5) 꿈에 동물이 나오거나 사람이 나오면 이 사람의 띠와 지지의 합·충 관계를 살펴 의미를 더해줘. 관련 없는 항목은 억지로 끼워 넣지 말고 해당되는 것만 풀어줘. 6) 원국의 간지와 오행 개수를 처음부터 다시 나열하지 말고, 꿈과 직접 관련된 글자와 근거만 이야기 흐름 속에서 짧게 언급해줘. 7) 꿈이 반드시 일어날 일을 예언하는 것처럼 단정하지 말고 겁주는 말도 쓰지 마. 해석이라는 점이 드러나게 써줘. 8) 말투는 정중한 합쇼체, 분량은 3~4문단으로 해줘. 마크다운(굵은 글씨, 제목, 목록)은 쓰지 마.`;
-        const answer=stripMdMarks(await callClaude(prompt, undefined, ctl.signal));
-        if(!answer) throw new Error('빈 응답을 받았습니다.');
-        box.textContent=(local?local+'\n\n':'')+answer;
-        box.classList.add('show'); showShareBar(box);
-      } catch(e){
-        if(e && e.name==='AbortError') err.textContent='AI 풀이 만들기를 중지했습니다. 버튼을 다시 누르면 새로 만들어요.';
-        else err.innerHTML='AI 풀이를 불러오지 못했습니다 ('+escapeHtml(e.message)+').<br>버튼을 다시 눌러 재시도해주세요.';
-        err.classList.add('show');
-        if(local){ box.classList.add('show'); showShareBar(box); }
-      } finally {
-        ctl=null; loading.classList.remove('show'); btn.disabled=false; btn.textContent='🔮 내 사주로 다시 보기';
-      }
-    });
+        prompt=`다음은 한 사람의 사주 정보입니다.\n\n${summary}\n\n[이 사람이 꾼 꿈]\n${text}\n\n[전통 해몽 사전에서 찾은 상징]\n${dreamSymLines()}\n\n이 사람의 사주와 꿈을 연결해서 풀이해줘. 위 [오늘 날짜]를 기준으로 '올해', '이번 달' 같은 시점을 해석해줘. [풀이 규칙] 1) 첫 문장에서 이 꿈이 이 사람의 사주 흐름에서 어떤 의미인지(좋은 쪽인지, 조심할 쪽인지, 마음이 반영된 꿈인지) 분명하게 먼저 말해줘. 2) 꿈의 상징을 오행으로 바꿔서(물=수, 불=화, 나무·꽃=목, 흙·집=토, 쇠·돈·칼=금 등), 이 사람 원국에서 부족하거나 넘치는 오행과 어떻게 대응하는지 풀어줘. 3) 꿈에 나온 재물·직장·사람·일과 관련된 십신(재성·관성·식상·인성·비겁)이 이 사람 원국에서 어떤 위치인지 짚어서 해석해줘. 4) 올해 세운과 이번 달 흐름이 꿈의 내용과 어떻게 맞닿는지 말해줘. 5) 꿈에 동물이 나오거나 사람이 나오면 이 사람의 띠와 지지의 합·충 관계를 살펴 의미를 더해줘. 관련 없는 항목은 억지로 끼워 넣지 말고 해당되는 것만 풀어줘. 6) 원국의 간지와 오행 개수를 처음부터 다시 나열하지 말고, 꿈과 직접 관련된 글자와 근거만 이야기 흐름 속에서 짧게 언급해줘. 7) 꿈이 반드시 일어날 일을 예언하는 것처럼 단정하지 말고 겁주는 말도 쓰지 마. 해석이라는 점이 드러나게 써줘. 8) 말투는 정중한 합쇼체, 분량은 3~4문단으로 해줘. 마크다운(굵은 글씨, 제목, 목록)은 쓰지 마.`;
+      } else prompt=buildDreamPrompt();
+      const answer=stripMdMarks(await callClaude(prompt, undefined, ctl.signal));
+      if(!answer) throw new Error('빈 응답을 받았습니다.');
+      const full=(local?local+'\n\n':'')+answer;
+      dreamOut[kind]=full; dreamOut[forKey]=text;
+      box.textContent=full; box.classList.add('show'); showShareBar(box);
+    } catch(e){
+      if(e && e.name==='AbortError') err.textContent='AI 풀이 만들기를 중지했습니다. "다시 풀이하기"를 누르면 새로 만들어요.';
+      else err.innerHTML='AI 풀이를 불러오지 못했습니다 ('+escapeHtml(e.message)+').<br>"다시 풀이하기"를 눌러 재시도해주세요.';
+      err.classList.add('show');
+      if(local && box.textContent){ showShareBar(box); }
+    } finally {
+      dreamCtl[kind]=null; loading.classList.remove('show');
+    }
   }
   document.getElementById('btnDream').addEventListener('click', ()=>openModal('dream'));
 
