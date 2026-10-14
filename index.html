@@ -306,7 +306,7 @@
 <div class="wrap">
 
   <div class="eyebrow">生年月日時 명식 계산</div>
-  <h1><span class="seal">命</span>사주원국</h1>
+  <h1><span class="seal">命</span>사주원국<button type="button" id="btnDream" title="꿈해몽" style="margin-left:auto; align-self:center; font-family:inherit; font-size:14px; font-weight:700; padding:7px 12px; border-radius:9px; border:1px solid var(--gold); background:#fffdf7; color:var(--ink); cursor:pointer; white-space:nowrap;">🌙 꿈해몽</button></h1>
 
   <div class="card" id="inputCard">
     <div class="row">
@@ -520,6 +520,7 @@
       <div class="panel reading-panel" id="panel-prayer"></div>
       <div class="panel reading-panel" id="panel-zodiac"></div>
       <div class="panel reading-panel" id="panel-qna"></div>
+      <div class="panel reading-panel" id="panel-dream"></div>
       <div class="panel reading-panel" id="panel-daewoon"></div>
       <div class="panel reading-panel" id="panel-sewoon"></div>
       <div class="panel reading-panel" id="panel-source"></div>
@@ -2142,7 +2143,7 @@ window.__pip = (function(){
     const add=(tag,cls,text)=>{ const el=doc.createElement(tag); if(cls) el.className=cls; el.textContent=text; cell.appendChild(el); return el; };
     add('h1','ps-title',label);
     if(sub) add('div','ps-sub',sub);
-    if(state){
+    if(state && pid!=='panel-dream'){
       const intro=(document.getElementById('introNote')||{}).textContent||'';
       const P=(pt)=>pt ? STEM_HANJA[pt.stem]+BRANCH_HANJA[pt.branch] : '미상';
       const nm=state.name ? state.name+' · ' : '';
@@ -3265,6 +3266,7 @@ window.__pip = (function(){
       else if(tab==='prayer') renderDateList('prayer');
       else if(tab==='zodiac') renderZodiac();
       else if(tab==='qna') renderQnA();
+      else if(tab==='dream') renderDream();
     } catch(err){
       const panel = document.getElementById('panel-'+tab);
       if(panel) panel.innerHTML = `<h4>오류</h4><p style="color:var(--seal);">화면을 불러오는 중 문제가 발생했어요: ${err.message}<br>페이지를 새로고침한 뒤 다시 시도해주세요.</p>`;
@@ -3315,7 +3317,7 @@ window.__pip = (function(){
   const PANEL_LABELS={
     'panel-reading':'사주풀이','panel-compat':'궁합','panel-fortune':'운세',
     'panel-wedding':'결혼택일','panel-moving':'이사택일','panel-prayer':'기도택일',
-    'panel-zodiac':'별자리','panel-qna':'실시간 Q&A','panel-daewoon':'대운','panel-sewoon':'세운','panel-ctx':'현재 상황'
+    'panel-zodiac':'별자리','panel-qna':'실시간 Q&A','panel-dream':'꿈해몽','panel-daewoon':'대운','panel-sewoon':'세운','panel-ctx':'현재 상황'
   };
   function openModal(tab){
     const panelId='panel-'+tab;
@@ -5027,6 +5029,274 @@ window.__pip = (function(){
       scrollToLastQna();
     }
   }
+
+
+  // ---------- 꿈해몽 ----------
+  // 사전: [찾을 말(쉼표), 이름, 풀이, 오행, 지지번호(띠 동물이면)]
+  // 찾을 말은 앞이 글자로 붙어 있지 않을 때만 인식한다 ("건물이"의 "물이"를 물로 잘못 읽지 않도록).
+  const DREAM_DICT=[
+    ['뱀,구렁이,배암','뱀(구렁이)','재물·권력·이성 인연·변화의 상징으로 풀이합니다. 큰 뱀이 몸을 감거나 집에 들어오면 재물과 귀한 인연이 다가오는 길몽으로 보고, 물리거나 쫓기면 일이 얽히거나 사람 때문에 신경 쓸 일이 생긴다고 봅니다.','화',5],
+    ['용,용꿈','용','출세·큰 성취·귀인의 상징입니다. 하늘로 오르는 용은 뜻을 이루는 매우 좋은 꿈으로 보고, 태몽이면 큰 인물을 뜻한다고 전해집니다.','토',4],
+    ['돼지,새끼돼지','돼지','재물과 복의 상징입니다. 돼지가 집에 들어오거나 안기면 재물운이 열린다고 보며, 새끼를 낳으면 사업이나 일이 불어나는 꿈으로 풀이합니다.','수',11],
+    ['호랑이,범','호랑이','권력·위엄·강한 상대를 뜻합니다. 호랑이를 타거나 길들이면 지위와 힘을 얻는 꿈으로, 쫓기면 버거운 일이나 윗사람에 대한 부담으로 풀이합니다.','목',2],
+    ['개,강아지,개가,개한테','개','충직한 사람·친구·신의를 상징합니다. 반갑게 따르면 믿을 만한 사람이 곁에 생기고, 물리면 가까운 이와 마찰이 있을 수 있다고 봅니다.','토',10],
+    ['고양이','고양이','은밀한 기운·구설·눈치 빠른 사람을 뜻합니다. 가까이 와서 편안하면 무난하고, 할퀴거나 도망가면 뒷말이나 서운한 일을 조심하라는 뜻으로 풀이합니다.','',-1],
+    ['소,황소,송아지','소','성실·결실·재물을 상징합니다. 소가 순하게 있으면 노력이 열매를 맺는 꿈으로, 소에게 쫓기면 해야 할 일이 밀려 있다는 뜻으로 봅니다.','토',1],
+    ['백마,망아지,말이,말을 타,말을 몰','말','활동·이동·소식을 뜻합니다. 말을 타고 달리면 일이 빠르게 풀리고, 말이 놀라 날뛰면 서두르다 생기는 실수를 조심하라는 꿈으로 풀이합니다.','화',6],
+    ['닭,병아리,수탉','닭·병아리','새 소식·시작·작은 재물을 상징합니다. 닭 울음은 새로운 출발이나 기쁜 소식으로, 병아리는 키워갈 일이 생기는 것으로 봅니다.','금',9],
+    ['쥐,생쥐','쥐','작은 재물 또는 잔걱정을 뜻합니다. 쥐가 곡식을 먹으면 새는 돈을, 잡으면 사소한 근심을 정리하는 꿈으로 풀이합니다.','수',0],
+    ['토끼','토끼','민첩함·순한 인연·태몽을 상징합니다. 토끼가 품에 안기면 좋은 소식이나 귀여운 인연으로 풀이합니다.','목',3],
+    ['양,염소','양·염소','온순함과 평화를 뜻합니다. 무리가 평온하면 안정, 흩어지거나 다치면 주변 사람을 돌보라는 뜻으로 봅니다.','토',7],
+    ['원숭이','원숭이','재주와 잔꾀, 경쟁을 뜻합니다. 장난치면 주변이 소란스러워지는 일을, 친해지면 재치 있는 도움을 얻는 것으로 풀이합니다.','금',8],
+    ['새,까치,비둘기,참새','새','소식과 자유를 상징합니다. 까치나 비둘기가 날아들면 반가운 소식으로, 새장에 갇히면 마음이 답답한 상황으로 풀이합니다.','',-1],
+    ['까마귀,올빼미','까마귀','불길한 예감이나 마음의 경고를 뜻하는 것으로 전해집니다. 다만 꿈 속 불안이 반영된 경우가 많아 몸과 마음을 살피라는 정도로 읽습니다.','',-1],
+    ['물고기,잉어,붕어,금붕어','물고기','재물·성취·태몽의 대표 상징입니다. 큰 잉어를 잡으면 시험·승진·재물의 좋은 꿈으로, 죽은 물고기는 기운이 빠지는 일로 풀이합니다.','수',-1],
+    ['거북이,거북','거북이','장수와 안정, 느리지만 확실한 성취를 뜻합니다. 집이나 물가에서 만나면 기반이 단단해지는 길몽으로 봅니다.','수',-1],
+    ['곰','곰','태몽에 자주 나오는 큰 기운이며, 믿음직한 후원자나 큰 인물을 뜻합니다. 쫓기면 버거운 책임이 다가온다고 풀이합니다.','',-1],
+    ['사슴','사슴','품격 있는 인연과 복을 상징합니다. 사슴이 다가오면 귀인이나 좋은 소식을 뜻합니다.','',-1],
+    ['여우,늑대','여우·늑대','교활하거나 속내를 숨긴 사람을 뜻합니다. 가까이 오면 사람 관계에서 신중하라는 신호로 풀이합니다.','',-1],
+    ['벌레,바퀴벌레,지렁이,구더기','벌레','자잘한 근심과 스트레스를 상징합니다. 많이 나오면 신경 쓸 일이 쌓인 상태로, 없애면 걱정이 정리되는 것으로 풀이합니다.','',-1],
+    ['거미','거미','얽힌 인연과 재물의 기미를 뜻합니다. 거미줄에 걸리면 일에 매이는 것으로, 집을 지으면 재물이 모이는 조짐으로 봅니다.','',-1],
+    ['나비','나비','사랑·변화·반가운 소식을 상징합니다. 나비가 몸에 앉으면 인연이 가까워진다고 풀이합니다.','',-1],
+    ['모기,파리','모기·파리','귀찮게 하는 사람이나 사소한 방해를 뜻합니다. 쫓아내면 거슬리는 일이 정리됩니다.','',-1],
+    ['물속,물이,물을,물에,물가,물결,맑은 물,강물,냇물,샘물','물','감정·재물·운의 흐름을 상징합니다. 맑고 잔잔하면 마음이 편하고 운이 순탄하며, 흐리고 거칠면 감정이 흔들리거나 일이 탁해지는 것으로 풀이합니다.','수',-1],
+    ['바다,파도','바다','넓은 가능성과 큰 감정을 뜻합니다. 잔잔한 바다는 새 기회, 거센 파도는 환경의 큰 변화나 감정의 격랑으로 봅니다.','수',-1],
+    ['강,냇가,개울','강','삶의 흐름과 건너야 할 시기를 상징합니다. 무사히 건너면 어려움을 넘기고, 물이 불어 못 건너면 아직 때가 아니라는 뜻으로 풀이합니다.','수',-1],
+    ['비,소나기,장마','비','정화와 해소, 때로는 우울을 뜻합니다. 시원하게 내리면 답답함이 풀리고, 비에 젖어 불편하면 마음이 축축한 상태로 봅니다.','수',-1],
+    ['눈,함박눈,눈이 내','눈(雪)','깨끗한 시작과 덮어 가라앉힘을 상징합니다. 하얗게 쌓이면 새 출발이나 길한 소식으로 풀이합니다.','수',-1],
+    ['홍수,물난리,물에 잠','홍수','감정이나 일이 한꺼번에 몰려오는 상태를 뜻합니다. 휩쓸리면 감당하기 벅찬 일이, 피하면 위기를 넘기는 것으로 풀이합니다.','수',-1],
+    ['불이,불을,불꽃,불길,불에,화재,불타','불','열정·명예·재물이 크게 일어남을 상징합니다. 집이 활활 타면 재물이 일어나는 길몽으로 전해지고, 번지는 불을 못 끄면 감정이나 일이 과열되는 것으로 봅니다.','화',-1],
+    ['연기','연기','불확실함과 답답함을 뜻합니다. 연기가 걷히면 상황이 분명해진다고 풀이합니다.','화',-1],
+    ['해,태양,일출,해가','해(태양)','큰 기운·명예·귀인을 상징합니다. 밝은 해가 뜨면 운이 열리고, 해를 안으면 큰 성취나 태몽으로 풀이합니다.','화',-1],
+    ['달,보름달,달이,달을','달','마음·여성·소망을 뜻합니다. 보름달은 소원 성취와 원만함, 초승달은 아직 차오르는 중인 일로 풀이합니다.','수',-1],
+    ['별,별똥별,유성','별','희망과 목표를 상징합니다. 별이 품에 들어오면 태몽이나 큰 소망의 실마리로, 떨어지면 마음의 흔들림으로 풀이합니다.','',-1],
+    ['번개,천둥,벼락','번개','갑작스러운 깨달음이나 사건을 뜻합니다. 번쩍하고 지나가면 놀랄 일 뒤의 변화로 봅니다.','화',-1],
+    ['바람,태풍,폭풍','바람·태풍','변화의 기운을 상징합니다. 살랑이면 새 소식, 거세면 환경이 크게 흔들리는 시기로 풀이합니다.','목',-1],
+    ['산,산에,산을,산꼭대기','산','목표·권위·큰 과제를 뜻합니다. 정상에 오르면 뜻을 이루고, 오르다 힘들면 아직 가야 할 길이 남았다는 뜻으로 봅니다.','토',-1],
+    ['나무,큰 나무,나뭇가지','나무','성장·가문·사람 관계를 상징합니다. 푸르고 크면 번창하고, 시들거나 쓰러지면 기운이 약해지는 것으로 풀이합니다.','목',-1],
+    ['꽃,꽃밭,꽃이,꽃을','꽃','기쁜 일·사랑·명예를 뜻합니다. 활짝 핀 꽃은 좋은 소식과 인연으로, 시든 꽃은 지나가는 시절로 풀이합니다.','목',-1],
+    ['과일,열매,감이,사과,복숭아,포도,감을','과일·열매','결실과 성과를 상징합니다. 탐스럽게 열리면 노력의 결과가 맺히고, 썩었으면 미뤄 둔 일이 상한다는 뜻으로 봅니다.','목',-1],
+    ['흙,땅,땅이,땅을,논,밭','흙·땅','기반과 재산을 뜻합니다. 땅을 얻거나 밟으면 안정과 재물로, 갈라지거나 꺼지면 기반이 흔들리는 일로 풀이합니다.','토',-1],
+    ['길,길이,길을,갈림길,막다른','길','삶의 방향을 상징합니다. 곧고 넓으면 순탄하고, 갈림길은 선택을, 막다른 길은 방법을 바꿔야 할 때로 풀이합니다.','',-1],
+    ['다리,다리를,다리가,다리 위','다리(橋)','건너감과 연결을 뜻합니다. 튼튼하면 새 국면으로 안전하게 넘어가고, 끊어지거나 흔들리면 불안한 전환기로 풀이합니다.','',-1],
+    ['문,대문,현관','문','기회와 새 단계의 입구를 상징합니다. 열리면 기회가, 잠겨 있으면 아직 막힌 일이 있다고 봅니다.','',-1],
+    ['집,집이,집을,집에','집','나 자신과 가정·기반을 상징합니다. 새집·넓은 집은 운이 커지고, 무너지거나 새는 집은 마음이나 가정의 불안으로 풀이합니다.','토',-1],
+    ['이사','이사','환경과 마음의 큰 변화를 뜻합니다. 좋은 곳으로 옮기면 새 출발로 풀이합니다.','',-1],
+    ['방,방에,빈방','방','내면 공간과 비밀을 상징합니다. 모르는 방을 발견하면 몰랐던 가능성이나 감춰 둔 마음으로 풀이합니다.','',-1],
+    ['화장실,변기','화장실','쌓인 것을 비우고 정리하는 꿈입니다. 깨끗하면 해소, 지저분하거나 막히면 정리가 안 되어 답답한 상태로 봅니다.','수',-1],
+    ['똥,변을,대변','똥','전통 해몽에서는 재물의 대표 길몽입니다. 똥을 밟거나 만지거나 묻으면 돈이 생긴다고 전해집니다.','토',-1],
+    ['오줌,소변','오줌','쌓인 감정이 풀리는 해소를 뜻합니다. 시원하면 걱정이 풀리고, 참으면 말 못 한 마음이 있는 것으로 봅니다.','수',-1],
+    ['피,피가,피를,출혈','피','재물 또는 생명력을 상징합니다. 피를 흘렸는데 아프지 않으면 재물이 들어오는 것으로 풀이하기도 하고, 몸이 지쳐 있다는 신호로도 봅니다.','',-1],
+    ['이빨,치아,이가 빠','이빨(치아)','가족·가까운 사람·기운의 소모를 상징합니다. 이가 빠지는 꿈은 걱정과 변화의 신호로 풀이하지만, 몸이 피곤하거나 긴장한 날에도 흔히 꿉니다.','',-1],
+    ['머리카락,머리를 자르,머리가 빠','머리카락','생각·체면·기운을 뜻합니다. 머리를 깔끔히 자르면 정리, 빠지면 걱정거리로 풀이합니다.','',-1],
+    ['임신,아기를 낳,출산','임신·출산','새로운 시작, 새 일의 잉태를 상징합니다. 꼭 아이가 아니라 계획·사업·작품이 탄생하는 꿈으로도 봅니다.','',-1],
+    ['아기,갓난,아이를 안','아기','순수한 시작·새 일·돌봄을 뜻합니다. 건강한 아기는 좋은 일의 출발로 풀이합니다.','',-1],
+    ['죽음,죽는,죽었,장례,상여','죽음','실제 죽음이 아니라 끝남과 새로운 시작, 전환을 뜻하는 경우가 많습니다. 내가 죽는 꿈은 묵은 것이 정리되고 새 국면이 열린다고 풀이합니다.','',-1],
+    ['돌아가신,조상,할머니가,할아버지가,죽은 사람','돌아가신 분','마음속 그리움과 보호의 메시지로 봅니다. 환하게 웃으면 안심, 무언가 말하면 그 내용을 마음에 새기라는 뜻으로 풀이합니다.','',-1],
+    ['시험,합격,불합격','시험','준비 상태와 평가받는 부담을 상징합니다. 합격은 자신감, 시험을 망치는 꿈은 불안이 반영된 것으로 봅니다.','',-1],
+    ['쫓기,쫓아,도망','쫓기는 꿈','피하고 싶은 일이나 부담을 상징합니다. 끝까지 도망만 치면 미뤄 둔 문제를, 맞서면 극복의 징조로 풀이합니다.','',-1],
+    ['떨어지,추락,낭떠러지','추락','불안과 통제력 상실의 느낌을 뜻합니다. 무사히 착지하면 위기를 넘기는 것으로 풀이합니다.','',-1],
+    ['날아,하늘을 날,날았','하늘을 나는 꿈','자유·상승·성취욕을 상징합니다. 높이 날면 뜻이 커지고, 낮게 힘겹게 날면 아직 힘이 모자라다고 봅니다.','',-1],
+    ['물에 빠','물에 빠짐','감정에 휩쓸리거나 일에 잠기는 상태를 뜻합니다. 헤엄쳐 나오면 극복, 가라앉으면 쉬어야 한다는 신호로 풀이합니다.','수',-1],
+    ['벌거벗,알몸,옷을 안 입','벌거벗음','드러남에 대한 불안이나 솔직함을 상징합니다. 아무도 신경 쓰지 않으면 걱정이 과한 것으로 봅니다.','',-1],
+    ['기차,버스,지하철,놓쳤,지각','놓침·지각','기회나 시간에 대한 조바심을 뜻합니다. 놓쳐도 다음 차가 오면 기회가 다시 있다는 의미로 풀이합니다.','',-1],
+    ['자동차,운전,차를,차가,브레이크','자동차·운전','삶의 방향을 내가 얼마나 통제하는지를 상징합니다. 잘 달리면 순항, 브레이크가 안 들면 속도를 늦추라는 신호로 풀이합니다.','금',-1],
+    ['비행기,공항','비행기','큰 도약과 먼 목표를 뜻합니다. 순조롭게 뜨면 목표가 가까워지고, 추락하면 무리한 계획을 점검하라는 뜻으로 풀이합니다.','',-1],
+    ['배를,배에,선박,배 위','배(船)','삶의 항해와 협력을 상징합니다. 순풍이면 순조롭고, 기울거나 가라앉으면 방향 점검이 필요하다고 봅니다.','수',-1],
+    ['돈,돈이,돈을,지폐,동전,현금','돈','재물 자체보다 가치·자신감·에너지를 상징합니다. 줍거나 받으면 기회로, 잃어버리면 소모되는 일을 조심하라는 뜻으로 풀이합니다.','금',-1],
+    ['금덩이,금반지,보석,다이아','금·보석','귀한 기회·재물·인연을 상징합니다. 손에 쥐면 길몽, 잃어버리면 소중한 것을 놓칠까 하는 불안으로 풀이합니다.','금',-1],
+    ['반지,목걸이,팔찌','반지·장신구','약속·인연·자기 가치를 뜻합니다. 반지를 받으면 새 인연이나 약속, 잃으면 관계에 대한 걱정으로 풀이합니다.','금',-1],
+    ['칼,칼을,칼이,가위','칼','결단과 갈등을 상징합니다. 칼을 쥐면 결정할 힘, 찔리거나 겨눠지면 날 선 말이나 갈등으로 풀이합니다.','금',-1],
+    ['총,총을,총이','총','강한 결단·공격성·긴박함을 뜻합니다. 쏘아서 맞히면 목표 달성, 총을 맞으면 압박감으로 풀이합니다.','금',-1],
+    ['싸움,싸우,다투,싸웠','싸움','내면의 갈등이나 현실의 긴장을 상징합니다. 이기면 문제를 넘기고, 지면 쌓인 불만을 풀 필요가 있다고 봅니다.','',-1],
+    ['결혼,웨딩,신랑,신부,결혼식','결혼','결합과 새로운 책임을 뜻합니다. 실제 혼인보다 새 일·새 관계의 시작으로 풀이하는 경우가 많습니다.','',-1],
+    ['이별,헤어,전 남자친구,전 여자친구,전 애인','이별·옛 인연','마음의 정리나 미련을 상징합니다. 편안하게 헤어지면 마무리, 붙잡으면 남은 감정을 돌아보라는 뜻으로 봅니다.','',-1],
+    ['연인,애인,키스,포옹','연인·애정','애정 욕구와 친밀감을 뜻합니다. 다정하면 관계가 안정, 어긋나면 서운함이 쌓였다는 신호로 풀이합니다.','',-1],
+    ['어머니,엄마','어머니','보살핌·안정·뿌리를 상징합니다. 밝은 모습은 마음이 든든함을, 아픈 모습은 돌봄이 필요한 마음으로 풀이합니다.','',-1],
+    ['아버지,아빠','아버지','권위·책임·후원을 뜻합니다. 인자하면 도움이, 엄하면 부담이나 점검할 일로 봅니다.','',-1],
+    ['자식,아들,딸,아이가','자식','희망과 걱정을 함께 상징합니다. 아이가 건강하면 좋은 소식, 아프거나 길을 잃으면 마음이 쓰이는 일로 풀이합니다.','',-1],
+    ['귀신,유령,악몽,가위','귀신·악몽','마음의 두려움과 피로가 형상화된 꿈으로 봅니다. 피곤하거나 스트레스가 많을 때 흔하며, 맞서면 극복의 징조로 풀이합니다.','',-1],
+    ['부처,예수,하느님,신령,관세음,천사','성스러운 존재','보호와 가르침, 마음의 안정을 상징합니다. 말씀이나 모습이 또렷하면 길몽으로 전해지고, 해야 할 바를 돌아보라는 뜻으로 읽습니다.','',-1],
+    ['절,교회,성당,사찰','절·교회','마음의 의지처와 정화를 뜻합니다. 편안히 머물면 안정과 기원의 응답으로 풀이합니다.','',-1],
+    ['시장,마트,상점','시장·가게','기회와 거래, 사람 관계를 상징합니다. 북적이면 활기와 재물 기회로 풀이합니다.','금',-1],
+    ['학교,교실,선생님','학교','배움과 평가, 옛 기억을 뜻합니다. 다시 학생이 되는 꿈은 배울 것이 있거나 부담이 있다는 신호로 풀이합니다.','',-1],
+    ['군대,입대,군복','군대','통제와 규율, 압박을 상징합니다. 책임이나 환경의 제약을 느끼는 상태로 풀이합니다.','',-1],
+    ['병원,수술,아프,병이','병원·병','몸과 마음을 돌보라는 신호입니다. 병이 낫는 꿈은 오히려 길몽으로, 회복과 해소를 뜻한다고 봅니다.','',-1],
+    ['목욕,샤워,씻','목욕·씻음','정화와 새 출발을 상징합니다. 깨끗이 씻으면 묵은 걱정이 풀리고 운이 맑아진다고 풀이합니다.','수',-1],
+    ['옷,새 옷,신발,구두','옷·신발','나의 역할과 상황을 뜻합니다. 새 옷은 새 기회·새 신분, 신발을 잃으면 방향이나 짝을 놓치는 불안으로 풀이합니다.','',-1],
+    ['거울','거울','자기 점검을 상징합니다. 선명하면 마음이 맑고, 깨지면 자기 모습에 대한 불안으로 풀이합니다.','금',-1],
+    ['편지,전화,문자','편지·전화','소식과 소통을 뜻합니다. 반가운 소식은 실제 연락이나 마음의 소통 욕구를 반영합니다.','',-1],
+    ['음식,밥,밥을,국수,케이크','음식','복·만족감·재물을 상징합니다. 맛있게 먹으면 만족과 복이, 상하거나 못 먹으면 채워지지 않는 마음으로 풀이합니다.','토',-1],
+    ['술,술을,취하','술','감정의 해방과 흐트러짐을 뜻합니다. 즐겁게 마시면 풀림, 취해서 곤란하면 절제가 필요하다는 신호로 봅니다.','수',-1],
+    ['우물,샘','우물·샘','마르지 않는 복과 마음의 깊이를 상징합니다. 맑은 물이 가득하면 재물과 지혜의 길몽으로 풀이합니다.','수',-1],
+    ['동굴,굴속,터널','동굴·터널','내면 깊은 곳이나 힘든 시기를 지나가는 과정을 뜻합니다. 끝의 빛이 보이면 곧 풀린다고 풀이합니다.','',-1],
+    ['계단,엘리베이터,사다리','계단·엘리베이터','상승과 하강, 지위의 변화를 상징합니다. 오르면 성장, 내려가면 정리나 침체, 멈추면 점검이 필요한 때로 봅니다.','',-1],
+    ['무덤,묘지,산소,관을,관이','무덤·관','끝과 재생을 상징합니다. 무덤을 만지면 재물과 명예가 오른다고 풀이하는 전통도 있습니다.','토',-1],
+    ['안개','안개','앞이 잘 보이지 않는 불확실함을 뜻합니다. 걷히면 상황이 선명해진다고 봅니다.','수',-1],
+    ['무지개','무지개','희망·화해·좋은 소식을 상징합니다. 무지개가 뜨면 어려움 뒤 좋은 일이 온다고 풀이합니다.','',-1],
+    ['눈물,울었,울고,울음','눈물·울음','쌓인 감정이 풀리는 정화의 꿈입니다. 실컷 울면 오히려 마음이 가벼워진다는 의미로 풀이합니다.','수',-1],
+    ['웃음,웃었,웃고','웃음','마음의 여유와 기쁜 소식을 뜻합니다.','',-1],
+    ['노래,춤,공연,무대','노래·춤·무대','표현 욕구와 주목받음을 상징합니다. 즐거우면 자신감을, 실수하면 평가에 대한 부담을 반영합니다.','',-1],
+    ['도둑,도둑이,도둑을,강도','도둑','소중한 것을 잃을까 하는 불안이나 실제 소모되는 것을 뜻합니다. 잡으면 문제를 막아내는 것으로 풀이합니다.','',-1],
+    ['손님,잔치,파티','손님·잔치','사람이 찾아오는 기쁜 일과 인연을 상징합니다. 북적이면 경사나 좋은 소식으로 풀이합니다.','',-1],
+    ['열쇠,키를','열쇠','문제를 푸는 방법과 기회를 뜻합니다. 열쇠를 얻으면 해결책을 찾고, 잃으면 막힘을 느끼는 것으로 풀이합니다.','금',-1],
+    ['시계,시간','시계','시간에 대한 압박과 때를 의미합니다. 멈추면 쉬어야 할 때, 빨리 가면 조급함으로 풀이합니다.','',-1],
+    ['책,책을,공부','책','지식과 계획을 상징합니다. 읽으면 배울 기회가, 못 읽으면 준비가 덜 된 느낌으로 풀이합니다.','',-1],
+    ['알,달걀,계란','알·달걀','가능성과 시작, 재물의 씨앗을 뜻합니다. 깨져 있으면 아직 때가 이르거나 조심할 일로 풀이합니다.','',-1],
+    ['씨앗,씨를,모종','씨앗','시작과 앞으로의 결실을 상징합니다. 심으면 노력이 쌓이는 때로 풀이합니다.','목',-1],
+    ['비 맞,우산','우산·비 맞음','보호와 감정의 노출을 뜻합니다. 우산이 있으면 안전, 없으면 준비가 부족한 마음으로 풀이합니다.','수',-1],
+    ['금붕어,수족관','수족관','제한된 안에서 누리는 안정이나 갇힌 느낌을 뜻합니다.','수',-1],
+    ['쓰레기,더러운,오물','쓰레기·오물','버릴 것과 재물의 양면을 상징합니다. 쓰레기가 몸에 묻는 꿈은 오히려 재물운으로 풀이하는 전통도 있습니다.','토',-1],
+    ['화분,정원','화분·정원','가꾸는 일과 마음의 여유를 뜻합니다. 잘 자라면 정성이 결실을 맺는다고 봅니다.','목',-1],
+    ['폭포','폭포','막힘이 한꺼번에 풀리는 힘을 상징합니다. 맑은 폭포는 속시원한 해소로 풀이합니다.','수',-1],
+    ['지진,산사태,무너','무너짐','기반이 흔들리는 불안을 뜻합니다. 크게 놀라도 무사하면 변화를 견뎌내는 힘으로 풀이합니다.','토',-1],
+    ['전쟁,폭탄,폭발','전쟁·폭발','큰 갈등과 감정의 폭발을 상징합니다. 현실의 압박이 극적으로 나타난 경우가 많습니다.','화',-1]
+  ];
+  const DREAM_ELEM_HANJA={'목':'木','화':'火','토':'土','금':'金','수':'水'};
+  const DREAM_ANIMAL=['쥐','소','호랑이','토끼','용','뱀','말','양','원숭이','닭','개','돼지'];
+  function findDreamSymbols(text){
+    const t=String(text||'').replace(/\s+/g,' ');
+    const found=[];
+    DREAM_DICT.forEach(en=>{
+      const aliases=en[0].split(',');
+      for(let i=0;i<aliases.length;i++){
+        const a=aliases[i].trim(); if(!a) continue;
+        let from=0, hit=false;
+        while(true){
+          const p=t.indexOf(a,from); if(p<0) break;
+          const prev=p>0 ? t.charAt(p-1) : '';
+          const rest=t.slice(p+a.length);
+          const okNext = a.length>1 || /^([^가-힣]|$)/.test(rest) || /^(이|가|을|를|은|는|에|으로|로|도|만|과|와|의|랑|한테|께)/.test(rest);
+          if(!/[가-힣]/.test(prev) && okNext){ hit=true; break; }
+          from=p+1;
+        }
+        if(hit){ found.push({name:en[1], desc:en[2], elem:en[3], branch:en[4]}); break; }
+      }
+    });
+    return found;
+  }
+  let dreamDraft='';
+  let dreamSyms=[];
+  function renderDream(){
+    const panel=document.getElementById('panel-dream');
+    const canLink=!!state;
+    panel.innerHTML=`
+      <h4>🌙 꿈해몽</h4>
+      <p style="font-size:12.5px;color:var(--ink-soft);">꾼 꿈을 최대한 자세히 적어 보세요. 누가 나왔는지, 어디였는지, 어떤 일이 있었는지, 꿈 속 기분은 어땠는지가 풀이에 도움이 돼요. 사주와 상관없이 꿈 이야기만으로 풀이합니다.</p>
+      <div class="voice-input-wrap">
+        <textarea id="dreamInput" rows="5" placeholder="예: 큰 구렁이가 물속에서 나와 내 몸을 감았는데 무섭지는 않았다..." style="width:100%; font-family:inherit; font-size:14pt; padding:9px 10px; border:1px solid var(--rule); border-radius:8px; background:#fffdf7; box-sizing:border-box;"></textarea>
+        <button type="button" class="mic-btn" id="micDreamInput" title="음성으로 입력">🎤</button>
+      </div>
+      <div class="mic-err" id="micErrDreamInput"></div>
+      <button class="go-btn" id="dreamGoBtn" style="margin-top:10px;">해몽하기</button>
+      <div class="ai-error" id="dreamNone"></div>
+      <div id="dreamResult" style="display:none;">
+        <div id="dreamKw" style="margin-top:14px;"></div>
+        <div class="ai-box" id="dreamDictBox"></div>
+        <div style="margin-top:12px;">
+          <button class="ai-btn" id="dreamAiBtn" style="margin-top:0;">✨ AI 심층 풀이 (꿈 전체 이야기를 엮어서 해석)</button>
+          <div class="ai-loading" id="dreamAiLoading">AI가 꿈 이야기를 풀이하고 있어요...</div>
+          <div class="ai-error" id="dreamAiError"></div>
+          <div class="ai-box" id="dreamAiBox"></div>
+        </div>
+        ${canLink ? `<div style="margin-top:12px;">
+          <button class="ai-btn" id="dreamLinkBtn" style="margin-top:0; background:var(--seal); border-color:var(--seal);">🔮 내 사주로 다시 보기</button>
+          <div class="ai-loading" id="dreamLinkLoading">AI가 내 사주와 꿈을 함께 풀이하고 있어요...</div>
+          <div class="ai-error" id="dreamLinkError"></div>
+          <div class="ai-box" id="dreamLinkBox"></div>
+        </div>` : ''}
+        <p style="font-size:11.5px;color:var(--ink-soft);margin-top:14px;">※ 전통·상징에 바탕한 해석이며, 꿈이 실제로 맞는지 틀리는지를 말해 주는 것은 아닙니다. 재미와 마음 돌아보기의 참고로만 봐 주세요.</p>
+      </div>`;
+    const ta=document.getElementById('dreamInput');
+    ta.value=dreamDraft;
+    ta.addEventListener('input',()=>{ dreamDraft=ta.value; });
+    wireAutoGrow(ta);
+    attachVoiceInput('dreamInput','micDreamInput','micErrDreamInput');
+    document.getElementById('dreamGoBtn').addEventListener('click', ()=>{
+      stopMicIfRecording('micDreamInput');
+      dreamDraft=ta.value;
+      const text=ta.value.trim();
+      const none=document.getElementById('dreamNone'), res=document.getElementById('dreamResult');
+      none.classList.remove('show'); none.textContent='';
+      if(!text){ none.textContent='꿈 내용을 먼저 적어 주세요.'; none.classList.add('show'); res.style.display='none'; return; }
+      dreamSyms=findDreamSymbols(text);
+      res.style.display='block';
+      ['dreamAiBox','dreamLinkBox'].forEach(id=>{ const b=document.getElementById(id); if(b){ b.classList.remove('show'); b.textContent=''; hideShareBar(b); } });
+      ['dreamAiError','dreamLinkError'].forEach(id=>{ const b=document.getElementById(id); if(b){ b.classList.remove('show'); b.textContent=''; } });
+      const kw=document.getElementById('dreamKw'), box=document.getElementById('dreamDictBox');
+      if(dreamSyms.length){
+        kw.innerHTML='<span style="font-size:12.5px;color:var(--ink-soft);margin-right:6px;">찾은 상징</span>'+dreamSyms.map(x=>`<span class="stage-tag" style="font-size:12px;margin:0 4px 4px 0;padding:2px 9px;">${escapeHtml(x.name)}</span>`).join('');
+        box.textContent=dreamSyms.map(x=>`■ ${x.name}\n${x.desc}`).join('\n\n');
+      } else {
+        kw.innerHTML='';
+        box.textContent='사전에서 딱 맞는 상징을 찾지 못했어요. 아래 "AI 심층 풀이"를 누르면 꿈 이야기 전체를 보고 풀이해 드려요.';
+      }
+      box.classList.add('show');
+      if(dreamSyms.length) showShareBar(box); else hideShareBar(box);
+    });
+    wireAI('dreamAiBtn','dreamAiLoading','dreamAiError','dreamAiBox', buildDreamPrompt);
+    if(canLink) wireDreamLink();
+  }
+  function dreamSymLines(){
+    return dreamSyms.length ? dreamSyms.map(x=>`- ${x.name}: ${x.desc}`).join('\n') : '(사전에서 찾은 상징 없음 — 꿈 이야기에서 직접 상징을 뽑아 풀이해줘)';
+  }
+  function buildDreamPrompt(){
+    const text=(document.getElementById('dreamInput').value||'').trim();
+    return `다음은 어떤 사람이 꾼 꿈 이야기입니다.\n\n[꿈 내용]\n${text}\n\n[전통 해몽 사전에서 찾은 상징]\n${dreamSymLines()}\n\n이 꿈을 전통 해몽과 상징 해석의 관점에서 풀이해줘. 사주나 운세 이야기는 하지 말고 꿈 자체만 풀이해줘. [풀이 규칙] 1) 첫 문장에서 이 꿈이 대체로 길한 편인지, 조심할 꿈인지, 마음이 반영된 평범한 꿈인지 분명하게 먼저 말해줘. 2) 장면을 순서대로 따라가며 상징들이 이야기 속에서 어떻게 이어지는지 하나의 흐름으로 풀어줘. 사전의 풀이를 그대로 나열하지 말고 꿈 속 기분(무서웠는지, 편안했는지)에 맞춰 의미를 고르거나 바꿔줘. 3) 이 꿈이 현실에서 어떤 마음 상태나 일을 가리킬 수 있는지, 지금 해볼 만한 일 한두 가지를 짧게 덧붙여줘. 4) 꿈이 반드시 일어날 일을 예언하는 것처럼 단정하지 말고, 겁주는 말도 쓰지 마. "~로 풀이합니다", "~로 봅니다"처럼 해석이라는 점이 드러나게 써줘. 5) 말투는 정중한 합쇼체로, 분량은 3~4문단으로 해줘. 마크다운(굵은 글씨, 제목, 목록)은 쓰지 마.`;
+  }
+  function dreamLocalLink(){
+    const c=state.counts||{}, lines=[];
+    const yb=state.s && state.s.year ? state.s.year.branch : -1;
+    if(yb>=0) lines.push(`내 띠: ${DREAM_ANIMAL[yb]}띠(${BRANCHES[yb]})`);
+    dreamSyms.forEach(x=>{
+      const parts=[];
+      if(x.elem){
+        const n=c[x.elem]; const h=DREAM_ELEM_HANJA[x.elem];
+        if(typeof n==='number'){
+          if(n<=0) parts.push(`${x.elem}(${h}) 기운이 내 원국에 없어서, 이 상징은 부족한 기운이 꿈에 나타난 것으로 볼 수 있어요`);
+          else if(n>=3) parts.push(`${x.elem}(${h}) 기운이 내 원국에 ${n}개로 많아서, 이미 강한 기운이 꿈에서도 크게 나타난 것으로 볼 수 있어요`);
+          else parts.push(`${x.elem}(${h}) 기운은 내 원국에 ${n}개로 적당히 자리하고 있어요`);
+        }
+      }
+      if(x.branch>=0 && x.branch===yb) parts.push('내 띠와 같은 동물이라 나 자신을 비추는 꿈으로 읽을 수 있어요');
+      if(parts.length) lines.push(`■ ${x.name}: ${parts.join(' / ')}`);
+    });
+    return lines.join('\n');
+  }
+  function wireDreamLink(){
+    const btn=document.getElementById('dreamLinkBtn'), loading=document.getElementById('dreamLinkLoading');
+    const err=document.getElementById('dreamLinkError'), box=document.getElementById('dreamLinkBox');
+    let ctl=null;
+    const stop=document.createElement('button'); stop.type='button'; stop.className='ai-stop'; stop.textContent='중지';
+    stop.onclick=()=>{ if(ctl) ctl.abort(); };
+    loading.appendChild(stop);
+    btn.addEventListener('click', async ()=>{
+      if(!state) return;
+      const text=(document.getElementById('dreamInput').value||'').trim();
+      err.classList.remove('show'); err.textContent='';
+      const local=dreamLocalLink();
+      box.textContent=local; box.classList.toggle('show', !!local); hideShareBar(box);
+      ctl=new AbortController();
+      loading.classList.add('show'); btn.disabled=true; btn.textContent='불러오는 중...';
+      try{
+        const {s,dayStemIdx,isMale:im,counts,strength,ys,year,month,day}=state;
+        const summary=buildSajuSummary(s,dayStemIdx,im,counts,strength,ys,year,month,day);
+        const prompt=`다음은 한 사람의 사주 정보입니다.\n\n${summary}\n\n[이 사람이 꾼 꿈]\n${text}\n\n[전통 해몽 사전에서 찾은 상징]\n${dreamSymLines()}\n\n이 사람의 사주와 꿈을 연결해서 풀이해줘. 위 [오늘 날짜]를 기준으로 '올해', '이번 달' 같은 시점을 해석해줘. [풀이 규칙] 1) 첫 문장에서 이 꿈이 이 사람의 사주 흐름에서 어떤 의미인지(좋은 쪽인지, 조심할 쪽인지, 마음이 반영된 꿈인지) 분명하게 먼저 말해줘. 2) 꿈의 상징을 오행으로 바꿔서(물=수, 불=화, 나무·꽃=목, 흙·집=토, 쇠·돈·칼=금 등), 이 사람 원국에서 부족하거나 넘치는 오행과 어떻게 대응하는지 풀어줘. 3) 꿈에 나온 재물·직장·사람·일과 관련된 십신(재성·관성·식상·인성·비겁)이 이 사람 원국에서 어떤 위치인지 짚어서 해석해줘. 4) 올해 세운과 이번 달 흐름이 꿈의 내용과 어떻게 맞닿는지 말해줘. 5) 꿈에 동물이 나오거나 사람이 나오면 이 사람의 띠와 지지의 합·충 관계를 살펴 의미를 더해줘. 관련 없는 항목은 억지로 끼워 넣지 말고 해당되는 것만 풀어줘. 6) 원국의 간지와 오행 개수를 처음부터 다시 나열하지 말고, 꿈과 직접 관련된 글자와 근거만 이야기 흐름 속에서 짧게 언급해줘. 7) 꿈이 반드시 일어날 일을 예언하는 것처럼 단정하지 말고 겁주는 말도 쓰지 마. 해석이라는 점이 드러나게 써줘. 8) 말투는 정중한 합쇼체, 분량은 3~4문단으로 해줘. 마크다운(굵은 글씨, 제목, 목록)은 쓰지 마.`;
+        const answer=stripMdMarks(await callClaude(prompt, undefined, ctl.signal));
+        if(!answer) throw new Error('빈 응답을 받았습니다.');
+        box.textContent=(local?local+'\n\n':'')+answer;
+        box.classList.add('show'); showShareBar(box);
+      } catch(e){
+        if(e && e.name==='AbortError') err.textContent='AI 풀이 만들기를 중지했습니다. 버튼을 다시 누르면 새로 만들어요.';
+        else err.innerHTML='AI 풀이를 불러오지 못했습니다 ('+escapeHtml(e.message)+').<br>버튼을 다시 눌러 재시도해주세요.';
+        err.classList.add('show');
+        if(local){ box.classList.add('show'); showShareBar(box); }
+      } finally {
+        ctl=null; loading.classList.remove('show'); btn.disabled=false; btn.textContent='🔮 내 사주로 다시 보기';
+      }
+    });
+  }
+  document.getElementById('btnDream').addEventListener('click', ()=>openModal('dream'));
 
 })();
 </script>
