@@ -5178,7 +5178,7 @@ window.__pip = (function(){
   let dreamDraft='';
   let dreamSyms=[];
   let dreamView='dict';
-  const dreamOut={dict:'', kw:'', ai:'', aiFor:'', link:'', linkFor:''};
+  const dreamOut={dictFor:'', dict:'', kw:'', ai:'', aiFor:'', link:'', linkFor:''};
   function dreamText(){ const t=document.getElementById('dreamInput'); return t ? (t.value||'').trim() : dreamDraft.trim(); }
   function renderDream(){
     const panel=document.getElementById('panel-dream');
@@ -5199,7 +5199,7 @@ window.__pip = (function(){
         </div>
       </div>
       <div class="dm-body">
-      <p id="dreamIntro" style="font-size:12.5px;color:var(--ink-soft);margin-top:0;">아래 칸에 꾼 꿈을 최대한 자세히 적어 보세요. 누가 나왔는지, 어디였는지, 어떤 일이 있었는지, 꿈 속 기분은 어땠는지가 풀이에 도움이 돼요.</p>
+      <p id="dreamIntro" style="font-size:12.5px;color:var(--ink-soft);margin-top:0;">아래 칸에 꾼 꿈을 최대한 자세히 적은 뒤, 위 메뉴를 눌러 풀이를 받으세요. 누가 나왔는지, 어디였는지, 어떤 일이 있었는지, 꿈 속 기분은 어땠는지가 풀이에 도움이 돼요.</p>
       <div id="dreamV-dict">
         <div class="ai-error" id="dreamNone"></div>
         <div id="dreamKw" style="margin-top:14px;"></div>
@@ -5226,7 +5226,6 @@ window.__pip = (function(){
       </div>
       <div class="mic-err" id="micErrDreamInput"></div>
 
-        <button class="go-btn" id="dreamGoBtn" style="margin-top:0;">해몽하기</button>
       </div>`;
     const ta=document.getElementById('dreamInput');
     ta.value=dreamDraft;
@@ -5241,7 +5240,6 @@ window.__pip = (function(){
       const b=document.getElementById(id);
       if(dreamOut[k]){ b.textContent=dreamOut[k]; b.classList.add('show'); showShareBar(b); }
     });
-    document.getElementById('dreamGoBtn').addEventListener('click', ()=>{ showDreamView('dict', false); doDreamDict(); });
     document.getElementById('dreamAiRe').addEventListener('click', ()=>runDreamAI('ai',true));
     document.getElementById('dreamLinkRe').addEventListener('click', ()=>runDreamAI('link',true));
     panel.querySelectorAll('[data-dv]').forEach(b=>b.addEventListener('click', ()=>showDreamView(b.dataset.dv, true)));
@@ -5255,14 +5253,16 @@ window.__pip = (function(){
       const el=document.getElementById('dreamV-'+k); if(el) el.style.display = (k===v) ? 'block' : 'none';
     });
     document.querySelectorAll('#panel-dream [data-dv]').forEach(b=>b.classList.toggle('on', b.dataset.dv===v));
-    if(auto && (v==='ai'||v==='link')) runDreamAI(v,false);
+    if(auto){ if(v==='dict') doDreamDict(false); else runDreamAI(v,false); }
   }
-  function doDreamDict(){
+  function doDreamDict(force){
     stopMicIfRecording('micDreamInput');
     const text=dreamText(); dreamDraft=text;
     const none=document.getElementById('dreamNone');
     none.classList.remove('show'); none.textContent='';
-    if(!text){ none.textContent='꿈 내용을 먼저 적어 주세요.'; none.classList.add('show'); return; }
+    if(!text){ none.textContent='아래 칸에 꿈 내용을 먼저 적어 주세요.'; none.classList.add('show'); return; }
+    if(!force && dreamOut.dict && dreamOut.dictFor===text) return; // 같은 꿈이면 이미 나온 풀이를 그대로 보여준다
+    dreamOut.dictFor=text;
     dreamSyms=findDreamSymbols(text);
     const kw=document.getElementById('dreamKw'), box=document.getElementById('dreamDictBox');
     if(dreamSyms.length){
