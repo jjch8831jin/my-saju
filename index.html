@@ -5188,12 +5188,15 @@ window.__pip = (function(){
         #panel-dream .dm-btn.on{ background:var(--ink); color:var(--paper); border-color:var(--ink); }
         #modalOverlay.fullscreen #panel-dream.show{ display:flex; flex-direction:column; min-height:100%; }
         #panel-dream .dm-body{ flex:1; }
+        #modalBox:has(#panel-dream.show){ padding-top:14px !important; }
+        #panel-dream.show{ border:none !important; background:transparent !important; box-shadow:none !important; padding:0 !important; margin-top:0 !important; }
+        #panel-dream h4.dm-title{ margin:0 0 8px !important; line-height:34px !important; padding-right:150px; }
         #panel-dream .dm-sub{ flex:none; font-size:12px; padding:6px 12px; margin-top:10px; }
       </style>
       <div style="position:sticky; top:-1px; z-index:5; background:var(--paper); padding:2px 0 10px; border-bottom:1px solid var(--rule); margin-bottom:12px;">
-        <h4 style="margin:0 0 8px;">🌙 꿈해몽</h4>
+        <h4 class="dm-title" style="margin:0 0 8px;">🌙 꿈해몽</h4>
         <div class="dm-menu" style="display:flex; gap:6px; flex-wrap:wrap;">
-          <button type="button" class="dm-btn" data-dv="dict">꿈해몽하기</button>
+          <button type="button" class="dm-btn" data-dv="dict">💤 꿈해몽하기</button>
           <button type="button" class="dm-btn" data-dv="ai">✨ AI 심층 풀이</button>
           <button type="button" class="dm-btn" data-dv="link">🔮 내 사주로 꿈풀이하기</button>
         </div>
