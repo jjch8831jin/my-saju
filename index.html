@@ -2073,9 +2073,9 @@ window.__pip = (function(){
     throw lastErr;
   }
   // 등록한 키를 차례로 써 보고, 한도에 걸리거나 못 쓰는 키면 자동으로 다음 키로 넘어간다
-  async function callClaude(promptText, retries, signal){
+  async function callClaude(promptText, retries, signal, noGuide){
     retries = retries===undefined ? 2 : retries;
-    const finalPrompt = promptText + guidelineBlock();
+    const finalPrompt = promptText + (noGuide ? '' : guidelineBlock());
     const list=loadKeyList();
     if(list.length===0){ const e=new Error('Gemini API 키를 먼저 아래의 API 키 설정에서 추가해주세요.'); e.status=400; throw e; }
     const activeId=loadActiveKeyId();
@@ -5334,7 +5334,7 @@ window.__pip = (function(){
         const summary=buildSajuSummary(s,dayStemIdx,im,counts,strength,ys,year,month,day);
         prompt=`다음은 한 사람의 사주 정보입니다.\n\n${summary}\n\n[이 사람이 꾼 꿈]\n${text}\n\n[전통 해몽 사전에서 찾은 상징]\n${dreamSymLines()}\n\n이 사람의 사주와 꿈을 연결해서 풀이해줘. 위 [오늘 날짜]를 기준으로 '올해', '이번 달' 같은 시점을 해석해줘. [풀이 규칙] 1) 첫 문장에서 이 꿈이 이 사람의 사주 흐름에서 어떤 의미인지(좋은 쪽인지, 조심할 쪽인지, 마음이 반영된 꿈인지) 분명하게 먼저 말해줘. 2) 꿈의 상징을 오행으로 바꿔서(물=수, 불=화, 나무·꽃=목, 흙·집=토, 쇠·돈·칼=금 등), 이 사람 원국에서 부족하거나 넘치는 오행과 어떻게 대응하는지 풀어줘. 3) 꿈에 나온 재물·직장·사람·일과 관련된 십신(재성·관성·식상·인성·비겁)이 이 사람 원국에서 어떤 위치인지 짚어서 해석해줘. 4) 올해 세운과 이번 달 흐름이 꿈의 내용과 어떻게 맞닿는지 말해줘. 5) 꿈에 동물이 나오거나 사람이 나오면 이 사람의 띠와 지지의 합·충 관계를 살펴 의미를 더해줘. 관련 없는 항목은 억지로 끼워 넣지 말고 해당되는 것만 풀어줘. 6) 원국의 간지와 오행 개수를 처음부터 다시 나열하지 말고, 꿈과 직접 관련된 글자와 근거만 이야기 흐름 속에서 짧게 언급해줘. 7) 꿈이 반드시 일어날 일을 예언하는 것처럼 단정하지 말고 겁주는 말도 쓰지 마. 해석이라는 점이 드러나게 써줘. 8) 말투는 정중한 합쇼체, 분량은 3~4문단으로 해줘. 마크다운(굵은 글씨, 제목, 목록)은 쓰지 마.`;
       } else prompt=buildDreamPrompt();
-      const answer=stripMdMarks(await callClaude(prompt, undefined, ctl.signal));
+      const answer=stripMdMarks(await callClaude(prompt, undefined, ctl.signal, !isLink)); // 순수 꿈풀이에는 사주풀이용 공통 답변 지침을 붙이지 않는다
       if(!answer) throw new Error('빈 응답을 받았습니다.');
       const full=(local?local+'\n\n':'')+answer;
       dreamOut[kind]=full; dreamOut[forKey]=text;
