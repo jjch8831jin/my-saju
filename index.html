@@ -5186,6 +5186,8 @@ window.__pip = (function(){
       <style>
         #panel-dream .dm-btn{ flex:1 1 auto; font-family:inherit; font-size:14px; font-weight:700; padding:8px 14px; border-radius:9px; border:1px solid var(--rule); background:#fffdf7; color:var(--ink); cursor:pointer; }
         #panel-dream .dm-btn.on{ background:var(--ink); color:var(--paper); border-color:var(--ink); }
+        #modalOverlay.fullscreen #panel-dream.show{ display:flex; flex-direction:column; min-height:100%; }
+        #panel-dream .dm-body{ flex:1; }
         #panel-dream .dm-sub{ flex:none; font-size:12px; padding:6px 12px; margin-top:10px; }
       </style>
       <div style="position:sticky; top:-1px; z-index:5; background:var(--paper); padding:2px 0 10px; border-bottom:1px solid var(--rule); margin-bottom:12px;">
@@ -5196,15 +5198,9 @@ window.__pip = (function(){
           <button type="button" class="dm-btn" data-dv="link">🔮 내 사주로 꿈풀이하기</button>
         </div>
       </div>
-      <p style="font-size:12.5px;color:var(--ink-soft);margin-top:0;">꾼 꿈을 최대한 자세히 적어 보세요. 누가 나왔는지, 어디였는지, 어떤 일이 있었는지, 꿈 속 기분은 어땠는지가 풀이에 도움이 돼요.</p>
-      <div class="voice-input-wrap">
-        <textarea id="dreamInput" rows="5" placeholder="예: 큰 구렁이가 물속에서 나와 내 몸을 감았는데 무섭지는 않았다..." style="width:100%; font-family:inherit; font-size:14pt; padding:9px 10px; border:1px solid var(--rule); border-radius:8px; background:#fffdf7; box-sizing:border-box; min-height:130px; max-height:40vh; resize:vertical;"></textarea>
-        <button type="button" class="mic-btn" id="micDreamInput" title="음성으로 입력">🎤</button>
-      </div>
-      <div class="mic-err" id="micErrDreamInput"></div>
-
+      <div class="dm-body">
+      <p id="dreamIntro" style="font-size:12.5px;color:var(--ink-soft);margin-top:0;">아래 칸에 꾼 꿈을 최대한 자세히 적어 보세요. 누가 나왔는지, 어디였는지, 어떤 일이 있었는지, 꿈 속 기분은 어땠는지가 풀이에 도움이 돼요.</p>
       <div id="dreamV-dict">
-        <button class="go-btn" id="dreamGoBtn" style="margin-top:10px;">해몽하기</button>
         <div class="ai-error" id="dreamNone"></div>
         <div id="dreamKw" style="margin-top:14px;"></div>
         <div class="ai-box" id="dreamDictBox"></div>
@@ -5221,7 +5217,17 @@ window.__pip = (function(){
         <div class="ai-box" id="dreamLinkBox"></div>
         <button type="button" class="dm-btn dm-sub" id="dreamLinkRe">다시 풀이하기</button>
       </div>
-      <p style="font-size:11.5px;color:var(--ink-soft);margin-top:14px;">※ 전통·상징에 바탕한 해석이며, 꿈이 실제로 맞는지 틀리는지를 말해 주는 것은 아닙니다. 재미와 마음 돌아보기의 참고로만 봐 주세요.</p>`;
+      <p style="font-size:11.5px;color:var(--ink-soft);margin-top:14px;">※ 전통·상징에 바탕한 해석이며, 꿈이 실제로 맞는지 틀리는지를 말해 주는 것은 아닙니다. 재미와 마음 돌아보기의 참고로만 봐 주세요.</p>
+      </div>
+      <div style="position:sticky; bottom:-1px; z-index:5; background:var(--paper); border-top:1px solid var(--rule); padding:10px 0 4px; margin-top:10px;">
+      <div class="voice-input-wrap">
+        <textarea id="dreamInput" rows="3" placeholder="예: 큰 구렁이가 물속에서 나와 내 몸을 감았는데 무섭지는 않았다..." style="width:100%; font-family:inherit; font-size:14pt; padding:9px 10px; border:1px solid var(--rule); border-radius:8px; background:#fffdf7; box-sizing:border-box; min-height:84px; max-height:40vh; resize:vertical;"></textarea>
+        <button type="button" class="mic-btn" id="micDreamInput" title="음성으로 입력">🎤</button>
+      </div>
+      <div class="mic-err" id="micErrDreamInput"></div>
+
+        <button class="go-btn" id="dreamGoBtn" style="margin-top:0;">해몽하기</button>
+      </div>`;
     const ta=document.getElementById('dreamInput');
     ta.value=dreamDraft;
     ta.addEventListener('input',()=>{ dreamDraft=ta.value; });
@@ -5235,12 +5241,14 @@ window.__pip = (function(){
       const b=document.getElementById(id);
       if(dreamOut[k]){ b.textContent=dreamOut[k]; b.classList.add('show'); showShareBar(b); }
     });
-    document.getElementById('dreamGoBtn').addEventListener('click', doDreamDict);
+    document.getElementById('dreamGoBtn').addEventListener('click', ()=>{ showDreamView('dict', false); doDreamDict(); });
     document.getElementById('dreamAiRe').addEventListener('click', ()=>runDreamAI('ai',true));
     document.getElementById('dreamLinkRe').addEventListener('click', ()=>runDreamAI('link',true));
     panel.querySelectorAll('[data-dv]').forEach(b=>b.addEventListener('click', ()=>showDreamView(b.dataset.dv, true)));
     showDreamView(dreamView, false);
+    dreamIntroUpdate();
   }
+  function dreamIntroUpdate(){ const p=document.getElementById('dreamIntro'); if(p) p.style.display=(dreamOut.dict||dreamOut.ai||dreamOut.link)?'none':''; }
   function showDreamView(v, auto){
     dreamView=v;
     ['dict','ai','link'].forEach(k=>{
@@ -5266,6 +5274,7 @@ window.__pip = (function(){
     }
     kw.innerHTML=dreamOut.kw; box.textContent=dreamOut.dict; box.classList.add('show');
     if(dreamSyms.length) showShareBar(box); else hideShareBar(box);
+    dreamIntroUpdate();
   }
   function dreamSymLines(){
     return dreamSyms.length ? dreamSyms.map(x=>`- ${x.name}: ${x.desc}`).join('\n') : '(사전에서 찾은 상징 없음 — 꿈 이야기에서 직접 상징을 뽑아 풀이해줘)';
@@ -5326,7 +5335,7 @@ window.__pip = (function(){
       if(!answer) throw new Error('빈 응답을 받았습니다.');
       const full=(local?local+'\n\n':'')+answer;
       dreamOut[kind]=full; dreamOut[forKey]=text;
-      box.textContent=full; box.classList.add('show'); showShareBar(box);
+      box.textContent=full; box.classList.add('show'); showShareBar(box); dreamIntroUpdate();
     } catch(e){
       if(e && e.name==='AbortError') err.textContent='AI 풀이 만들기를 중지했습니다. "다시 풀이하기"를 누르면 새로 만들어요.';
       else err.innerHTML='AI 풀이를 불러오지 못했습니다 ('+escapeHtml(e.message)+').<br>"다시 풀이하기"를 눌러 재시도해주세요.';
