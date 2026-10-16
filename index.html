@@ -5177,8 +5177,10 @@ window.__pip = (function(){
   }
   let dreamDraft='';
   let dreamSyms=[];
-  let dreamView='dict';
-  const dreamOut={dictFor:'', dict:'', kw:'', ai:'', aiFor:'', link:'', linkFor:''};
+  let dreamMode='dict';   // 다음 질문을 풀이할 방식: dict(사전) / ai(AI 심층) / link(내 사주로)
+  let dreamHist=[];       // 질문과 풀이 기록 (앱을 켜 둔 동안만 남음)
+  let dreamBusy=false;
+  const DREAM_MODE_LABEL={dict:'💤 꿈해몽하기', ai:'✨ AI 심층 풀이', link:'🔮 내 사주로 꿈풀이하기'};
   function dreamText(){ const t=document.getElementById('dreamInput'); return t ? (t.value||'').trim() : dreamDraft.trim(); }
   function renderDream(){
     const panel=document.getElementById('panel-dream');
@@ -5191,7 +5193,6 @@ window.__pip = (function(){
         #modalBox:has(#panel-dream.show){ padding-top:14px !important; }
         #panel-dream.show{ border:none !important; background:transparent !important; box-shadow:none !important; padding:0 !important; margin-top:0 !important; }
         #panel-dream h4.dm-title{ margin:0 0 8px !important; line-height:34px !important; padding-right:150px; }
-        #panel-dream .dm-sub{ flex:none; font-size:12px; padding:6px 12px; margin-top:10px; }
       </style>
       <div style="position:sticky; top:-1px; z-index:5; background:var(--paper); padding:2px 0 10px; border-bottom:1px solid var(--rule); margin-bottom:12px;">
         <h4 class="dm-title" style="margin:0 0 8px;">🌙 꿈해몽</h4>
@@ -5202,29 +5203,14 @@ window.__pip = (function(){
         </div>
       </div>
       <div class="dm-body">
-      <p id="dreamIntro" style="font-size:12.5px;color:var(--ink-soft);margin-top:0;">아래 칸에 꾼 꿈을 최대한 자세히 적은 뒤, 위 메뉴를 눌러 풀이를 받으세요. 누가 나왔는지, 어디였는지, 어떤 일이 있었는지, 꿈 속 기분은 어땠는지가 풀이에 도움이 돼요.</p>
-      <div id="dreamV-dict">
-        <div class="ai-error" id="dreamNone"></div>
-        <div id="dreamKw" style="margin-top:14px;"></div>
-        <div class="ai-box" id="dreamDictBox"></div>
-      </div>
-      <div id="dreamV-ai" style="display:none;">
-        <div class="ai-loading" id="dreamAiLoading">AI가 꿈 이야기를 풀이하고 있어요...</div>
-        <div class="ai-error" id="dreamAiError"></div>
-        <div class="ai-box" id="dreamAiBox"></div>
-        <button type="button" class="dm-btn dm-sub" id="dreamAiRe">다시 풀이하기</button>
-      </div>
-      <div id="dreamV-link" style="display:none;">
-        <div class="ai-loading" id="dreamLinkLoading">AI가 내 사주와 꿈을 함께 풀이하고 있어요...</div>
-        <div class="ai-error" id="dreamLinkError"></div>
-        <div class="ai-box" id="dreamLinkBox"></div>
-        <button type="button" class="dm-btn dm-sub" id="dreamLinkRe">다시 풀이하기</button>
-      </div>
+      <p id="dreamIntro" style="font-size:12.5px;color:var(--ink-soft);margin-top:0;">아래 칸에 꾼 꿈을 최대한 자세히 적고 Enter를 치면, 위에서 고른 방식으로 풀이해 드려요. 누가 나왔는지, 어디였는지, 어떤 일이 있었는지, 꿈 속 기분은 어땠는지가 풀이에 도움이 돼요.</p>
+      <div id="dreamHistoryBox" style="display:flex; flex-direction:column; gap:14px; margin:14px 0;"></div>
       <p style="font-size:11.5px;color:var(--ink-soft);margin-top:14px;">※ 전통·상징에 바탕한 해석이며, 꿈이 실제로 맞는지 틀리는지를 말해 주는 것은 아닙니다. 재미와 마음 돌아보기의 참고로만 봐 주세요.</p>
       </div>
       <div style="position:sticky; bottom:-1px; z-index:5; background:var(--paper); border-top:1px solid var(--rule); padding:10px 0 4px; margin-top:10px;">
+      <div class="ai-error" id="dreamError"></div>
       <div class="voice-input-wrap">
-        <textarea id="dreamInput" rows="3" placeholder="예: 큰 구렁이가 물속에서 나와 내 몸을 감았는데 무섭지는 않았다..." style="width:100%; font-family:inherit; font-size:14pt; padding:9px 10px; border:1px solid var(--rule); border-radius:8px; background:#fffdf7; box-sizing:border-box; min-height:84px; max-height:40vh; resize:vertical;"></textarea>
+        <textarea id="dreamInput" rows="3" placeholder="예: 큰 구렁이가 물속에서 나와 내 몸을 감았는데 무섭지는 않았다... (Enter로 바로 풀이, 줄바꿈은 Shift+Enter)" style="width:100%; font-family:inherit; font-size:14pt; padding:9px 10px; border:1px solid var(--rule); border-radius:8px; background:#fffdf7; box-sizing:border-box; min-height:84px; max-height:40vh; resize:vertical;"></textarea>
         <button type="button" class="mic-btn" id="micDreamInput" title="음성으로 입력">🎤</button>
       </div>
       <div class="mic-err" id="micErrDreamInput"></div>
@@ -5233,58 +5219,90 @@ window.__pip = (function(){
     const ta=document.getElementById('dreamInput');
     ta.value=dreamDraft;
     ta.addEventListener('input',()=>{ dreamDraft=ta.value; });
+    ta.addEventListener('keydown',(e)=>{
+      if(e.key==='Enter' && !e.shiftKey && !e.isComposing){ e.preventDefault(); askDream(); }
+    });
     wireAutoGrow(ta); setTimeout(()=>autoGrow(ta),60);
     attachVoiceInput('dreamInput','micDreamInput','micErrDreamInput');
-    // 이전에 만든 결과가 있으면 그대로 복원
-    const kw=document.getElementById('dreamKw'), dbox=document.getElementById('dreamDictBox');
-    kw.innerHTML=dreamOut.kw;
-    if(dreamOut.dict){ dbox.textContent=dreamOut.dict; dbox.classList.add('show'); if(dreamSyms.length) showShareBar(dbox); }
-    [['ai','dreamAiBox'],['link','dreamLinkBox']].forEach(([k,id])=>{
-      const b=document.getElementById(id);
-      if(dreamOut[k]){ b.textContent=dreamOut[k]; b.classList.add('show'); showShareBar(b); }
-    });
-    document.getElementById('dreamAiRe').addEventListener('click', ()=>runDreamAI('ai',true));
-    document.getElementById('dreamLinkRe').addEventListener('click', ()=>runDreamAI('link',true));
-    panel.querySelectorAll('[data-dv]').forEach(b=>b.addEventListener('click', ()=>showDreamView(b.dataset.dv, true)));
-    showDreamView(dreamView, false);
-    dreamIntroUpdate();
+    panel.querySelectorAll('[data-dv]').forEach(b=>b.addEventListener('click', ()=>showDreamMode(b.dataset.dv)));
+    showDreamMode(dreamMode);
+    renderDreamHist();
+    // 이전 대화가 있으면 창을 열자마자 가장 최근 대화 쪽(아래)으로 이동
+    if(dreamHist.length>0){ setTimeout(()=>{ const sc=getModalScroll(); if(sc) sc.scrollTop=sc.scrollHeight; }, 30); }
   }
-  function dreamIntroUpdate(){ const p=document.getElementById('dreamIntro'); if(p) p.style.display=(dreamOut.dict||dreamOut.ai||dreamOut.link)?'none':''; }
-  function showDreamView(v, auto){
-    dreamView=v;
-    ['dict','ai','link'].forEach(k=>{
-      const el=document.getElementById('dreamV-'+k); if(el) el.style.display = (k===v) ? 'block' : 'none';
-    });
+  function dreamIntroUpdate(){ const p=document.getElementById('dreamIntro'); if(p) p.style.display=dreamHist.length?'none':''; }
+  function showDreamMode(v){
+    dreamMode=v;
     document.querySelectorAll('#panel-dream [data-dv]').forEach(b=>b.classList.toggle('on', b.dataset.dv===v));
-    if(auto){ if(v==='dict') doDreamDict(false); else runDreamAI(v,false); }
   }
-  function doDreamDict(force){
-    stopMicIfRecording('micDreamInput');
-    const text=dreamText(); dreamDraft=text;
-    const none=document.getElementById('dreamNone');
-    none.classList.remove('show'); none.textContent='';
-    if(!text){ none.textContent='아래 칸에 꿈 내용을 먼저 적어 주세요.'; none.classList.add('show'); return; }
-    if(!force && dreamOut.dict && dreamOut.dictFor===text) return; // 같은 꿈이면 이미 나온 풀이를 그대로 보여준다
-    dreamOut.dictFor=text;
-    dreamSyms=findDreamSymbols(text);
-    const kw=document.getElementById('dreamKw'), box=document.getElementById('dreamDictBox');
-    if(dreamSyms.length){
-      dreamOut.kw='<span style="font-size:12.5px;color:var(--ink-soft);margin-right:6px;">찾은 상징</span>'+dreamSyms.map(x=>`<span class="stage-tag" style="font-size:12px;margin:0 4px 4px 0;padding:2px 9px;">${escapeHtml(x.name)}</span>`).join('');
-      dreamOut.dict=dreamSyms.map(x=>`■ ${x.name}\n${x.desc}`).join('\n\n');
-    } else {
-      dreamOut.kw='';
-      dreamOut.dict='사전에서 딱 맞는 상징을 찾지 못했어요. 위 메뉴의 "✨ AI 심층 풀이"를 누르면 꿈 이야기 전체를 보고 풀이해 드려요.';
-    }
-    kw.innerHTML=dreamOut.kw; box.textContent=dreamOut.dict; box.classList.add('show');
-    if(dreamSyms.length) showShareBar(box); else hideShareBar(box);
+  // 오래된 질문이 위, 최신 질문이 아래 (채팅 방식). 질문은 보내자마자 올라가고, 풀이는 도착하면 그 밑에 채워진다.
+  function renderDreamHist(){
+    const box=document.getElementById('dreamHistoryBox'); if(!box) return;
+    box.innerHTML = dreamHist.map(item=>{
+      let ans='';
+      if(item.a!=null) ans=`<div class="ai-box show" style="margin-top:0;">${escapeHtml(item.a)}</div><div class="share-bar" style="display:flex;">${buildShareBarHTML()}</div>`;
+      else if(!item.err) ans=`<div class="ai-box show" style="margin-top:0; color:var(--ink-soft);">AI가 ${item.mode==='link'?'내 사주와 꿈을 함께 ':'꿈 이야기를 '}풀이하고 있어요…<button type="button" class="ai-stop" data-ai-stop="dream">중지</button></div>`;
+      if(item.err) ans+=`<div class="ai-box show" style="margin-top:${item.a!=null?'6px':'0'}; color:var(--seal);">⚠️ ${escapeHtml(item.err)}</div>`;
+      const kw = (item.syms && item.syms.length) ? '<span style="font-size:12px;color:var(--ink-soft);margin:0 6px 0 4px;">찾은 상징</span>'+item.syms.map(x=>`<span class="stage-tag" style="font-size:12px;margin:0 4px 4px 0;padding:2px 9px;">${escapeHtml(x.name)}</span>`).join('') : '';
+      return `
+      <div class="qna-item">
+        <div style="font-size:13px;font-weight:700;color:var(--ink);margin-bottom:6px;">Q. ${escapeHtml(item.q)}</div>
+        <div style="margin-bottom:6px;"><span style="font-size:11.5px;color:var(--ink-soft);">${DREAM_MODE_LABEL[item.mode]||''}</span>${kw}</div>
+        ${ans}
+      </div>`;
+    }).join('');
     dreamIntroUpdate();
+  }
+  async function askDream(){
+    if(dreamBusy) return;
+    const input=document.getElementById('dreamInput'); if(!input) return;
+    const q=input.value.trim(); if(!q) return;
+    stopMicIfRecording('micDreamInput');
+    const mode=dreamMode, errEl=document.getElementById('dreamError');
+    errEl.classList.remove('show'); errEl.textContent='';
+    if(mode==='link' && !state){ errEl.textContent='먼저 첫 화면에서 사주를 계산해 주세요. 사주를 계산한 뒤에 내 사주로 꿈을 풀이할 수 있어요.'; errEl.classList.add('show'); return; }
+    const syms=findDreamSymbols(q); dreamSyms=syms;
+    const item={q, mode, a:null, err:null, syms};
+    const past=dreamHist.filter(it=>it.a!=null).slice(-10).map((it,i)=>`Q${i+1}. ${it.q}\nA${i+1}. ${it.a}`).join('\n\n');
+    const hist=past ? `\n\n[지금까지 나눈 대화]\n${past}\n\n위 대화를 기억하고 이어서 답해줘. 이미 설명한 내용은 반복하지 마.\n\n` : '';
+    // 엔터를 치는 즉시 질문을 창에 올리고 입력칸을 비운다 (풀이는 나중에 채워진다)
+    dreamHist.push(item); input.value=''; dreamDraft=''; autoGrow(input);
+    if(mode==='dict'){
+      item.a = syms.length ? syms.map(x=>`■ ${x.name}\n${x.desc}`).join('\n\n') : '사전에서 딱 맞는 상징을 찾지 못했어요. 위 메뉴에서 "✨ AI 심층 풀이"를 고른 뒤 다시 보내면 꿈 이야기 전체를 보고 풀이해 드려요.';
+      renderDreamHist(); scrollToLastQna('dreamHistoryBox'); return;
+    }
+    dreamBusy=true;
+    const ctl=new AbortController(); aiCtls.dream=ctl;
+    renderDreamHist(); scrollToLastQna('dreamHistoryBox');
+    const isLink=(mode==='link');
+    const local = isLink ? dreamLocalLink() : '';
+    const text=q;
+    try{
+      let prompt;
+      if(isLink){
+        const {s,dayStemIdx,isMale:im,counts,strength,ys,year,month,day}=state;
+        const summary=buildSajuSummary(s,dayStemIdx,im,counts,strength,ys,year,month,day);
+        prompt=`다음은 한 사람의 사주 정보입니다.\n\n${summary}\n\n${hist}[이 사람이 꾼 꿈 이야기, 또는 앞선 대화에 이어지는 질문]\n${text}\n\n[전통 해몽 사전에서 찾은 상징]\n${dreamSymLines()}\n\n이 사람의 사주와 꿈을 연결해서 풀이해줘. 이번 글이 앞선 대화에 이어지는 질문이면 아래 [풀이 규칙]의 형식에 얽매이지 말고 질문에 맞는 답만 2~3문단으로 이어서 해줘(앞에서 한 말은 반복하지 마). 위 [오늘 날짜]를 기준으로 '올해', '이번 달' 같은 시점을 해석해줘. [풀이 규칙] 1) 첫 문장에서 이 꿈이 이 사람의 사주 흐름에서 어떤 의미인지(좋은 쪽인지, 조심할 쪽인지, 마음이 반영된 꿈인지) 분명하게 먼저 말해줘. 2) 꿈의 상징을 오행으로 바꿔서(물=수, 불=화, 나무·꽃=목, 흙·집=토, 쇠·돈·칼=금 등), 이 사람 원국에서 부족하거나 넘치는 오행과 어떻게 대응하는지 풀어줘. 3) 꿈에 나온 재물·직장·사람·일과 관련된 십신(재성·관성·식상·인성·비겁)이 이 사람 원국에서 어떤 위치인지 짚어서 해석해줘. 4) 올해 세운과 이번 달 흐름이 꿈의 내용과 어떻게 맞닿는지 말해줘. 5) 꿈에 동물이 나오거나 사람이 나오면 이 사람의 띠와 지지의 합·충 관계를 살펴 의미를 더해줘. 관련 없는 항목은 억지로 끼워 넣지 말고 해당되는 것만 풀어줘. 6) 원국의 간지와 오행 개수를 처음부터 다시 나열하지 말고, 꿈과 직접 관련된 글자와 근거만 이야기 흐름 속에서 짧게 언급해줘. 7) 꿈이 반드시 일어날 일을 예언하는 것처럼 단정하지 말고 겁주는 말도 쓰지 마. 해석이라는 점이 드러나게 써줘. 8) 말투는 정중한 합쇼체, 분량은 3~4문단으로 해줘. 마크다운(굵은 글씨, 제목, 목록)은 쓰지 마.`;
+      } else prompt=buildDreamPrompt(text, hist);
+      const answer=stripMdMarks(await callClaude(prompt, undefined, ctl.signal, !isLink)); // 순수 꿈풀이에는 사주풀이용 공통 답변 지침을 붙이지 않는다
+      if(!answer) throw new Error('빈 응답을 받았습니다.');
+      item.a=(local?local+'\n\n':'')+answer;
+    } catch(e){
+      item.err = (e && e.name==='AbortError') ? '풀이 만들기를 중지했습니다. 같은 꿈을 다시 보내 주세요.' : '풀이를 불러오지 못했습니다 ('+e.message+'). 같은 꿈을 다시 보내 주세요.';
+      if(local) item.a=local;
+      // 방금 보낸 글을 입력칸에 되돌려 놓아서, 다시 쓰지 않고 엔터만 치면 되게 한다
+      const inp=document.getElementById('dreamInput');
+      if(inp && !inp.value){ inp.value=q; dreamDraft=q; autoGrow(inp); }
+    } finally {
+      dreamBusy=false; aiCtls.dream=null;
+      renderDreamHist(); scrollToLastQna('dreamHistoryBox');
+    }
   }
   function dreamSymLines(){
     return dreamSyms.length ? dreamSyms.map(x=>`- ${x.name}: ${x.desc}`).join('\n') : '(사전에서 찾은 상징 없음 — 꿈 이야기에서 직접 상징을 뽑아 풀이해줘)';
   }
-  function buildDreamPrompt(){
-    const text=(document.getElementById('dreamInput').value||'').trim();
-    return `다음은 어떤 사람이 꾼 꿈 이야기입니다.\n\n[꿈 내용]\n${text}\n\n[전통 해몽 사전에서 찾은 상징]\n${dreamSymLines()}\n\n이 꿈을 전통 해몽과 상징 해석의 관점에서 풀이해줘. 사주나 운세 이야기는 하지 말고 꿈 자체만 풀이해줘. [풀이 규칙] 1) 첫 문장에서 이 꿈이 대체로 길한 편인지, 조심할 꿈인지, 마음이 반영된 평범한 꿈인지 분명하게 먼저 말해줘. 2) 장면을 순서대로 따라가며 상징들이 이야기 속에서 어떻게 이어지는지 하나의 흐름으로 풀어줘. 사전의 풀이를 그대로 나열하지 말고 꿈 속 기분(무서웠는지, 편안했는지)에 맞춰 의미를 고르거나 바꿔줘. 3) 상징의 일반적인 뜻만 말하고 끝내지 말고, 이 꿈의 이 장면에서 왜 그런 의미가 되는지 이유를 함께 설명해줘. 4) 이 꿈이 현실의 일, 사람 관계, 재물, 마음 상태 중 어느 쪽을 가리킬 수 있는지 짚어줘. 꿈 내용에 단서가 없는 부분(꿈 속 기분이 적혀 있지 않은 경우 등)은 지어내거나 단정하지 말고, 그럴 때는 어느 쪽이면 어떻게 읽을 수 있는지 갈라서 말해줘. 5) 마지막 문단에는 지금 해볼 만한 일 한두 가지와, 스스로 돌아볼 질문 한두 개를 넣어줘. 6) 꿈이 반드시 일어날 일을 예언하는 것처럼 단정하지 말고, 겁주는 말도 쓰지 마. "~로 풀이합니다", "~로 봅니다"처럼 해석이라는 점이 드러나게 써줘. 7) 말투는 정중한 합쇼체로, 분량은 4~5문단으로 해줘. 마크다운(굵은 글씨, 제목, 목록)은 쓰지 마.`;
+  function buildDreamPrompt(text, hist){
+    return `다음은 어떤 사람이 꾼 꿈 이야기, 또는 앞서 풀이한 꿈에 이어서 하는 질문입니다.${hist}\n\n[이번에 받은 글]\n${text}\n\n[전통 해몽 사전에서 찾은 상징]\n${dreamSymLines()}\n\n이번 글이 새로 꾼 꿈 이야기이면 그 꿈을 전통 해몽과 상징 해석의 관점에서 풀이해줘. 앞선 대화에 이어지는 질문이면 아래 [풀이 규칙]의 형식에 얽매이지 말고 질문에 맞는 답만 2~3문단으로 이어서 해줘(앞에서 한 말은 반복하지 마). 사주나 운세 이야기는 하지 말고 꿈 자체만 풀이해줘. [풀이 규칙](새 꿈 이야기일 때) 1) 첫 문장에서 이 꿈이 대체로 길한 편인지, 조심할 꿈인지, 마음이 반영된 평범한 꿈인지 분명하게 먼저 말해줘. 2) 장면을 순서대로 따라가며 상징들이 이야기 속에서 어떻게 이어지는지 하나의 흐름으로 풀어줘. 사전의 풀이를 그대로 나열하지 말고 꿈 속 기분(무서웠는지, 편안했는지)에 맞춰 의미를 고르거나 바꿔줘. 3) 상징의 일반적인 뜻만 말하고 끝내지 말고, 이 꿈의 이 장면에서 왜 그런 의미가 되는지 이유를 함께 설명해줘. 4) 이 꿈이 현실의 일, 사람 관계, 재물, 마음 상태 중 어느 쪽을 가리킬 수 있는지 짚어줘. 꿈 내용에 단서가 없는 부분(꿈 속 기분이 적혀 있지 않은 경우 등)은 지어내거나 단정하지 말고, 그럴 때는 어느 쪽이면 어떻게 읽을 수 있는지 갈라서 말해줘. 5) 마지막 문단에는 지금 해볼 만한 일 한두 가지와, 스스로 돌아볼 질문 한두 개를 넣어줘. 6) 꿈이 반드시 일어날 일을 예언하는 것처럼 단정하지 말고, 겁주는 말도 쓰지 마. "~로 풀이합니다", "~로 봅니다"처럼 해석이라는 점이 드러나게 써줘. 7) 말투는 정중한 합쇼체로, 분량은 4~5문단으로 해줘. 마크다운(굵은 글씨, 제목, 목록)은 쓰지 마.`;
   }
   function dreamLocalLink(){
     const c=state.counts||{}, lines=[];
@@ -5304,49 +5322,6 @@ window.__pip = (function(){
       if(parts.length) lines.push(`■ ${x.name}: ${parts.join(' / ')}`);
     });
     return lines.join('\n');
-  }
-  const dreamCtl={ai:null, link:null};
-  async function runDreamAI(kind, force){
-    const isLink = kind==='link';
-    const cap = isLink ? 'Link' : 'Ai';
-    const loading=document.getElementById('dream'+cap+'Loading'), err=document.getElementById('dream'+cap+'Error'), box=document.getElementById('dream'+cap+'Box');
-    if(dreamCtl[kind]) return; // 이미 만드는 중
-    const text=dreamText();
-    err.classList.remove('show'); err.textContent='';
-    if(!text){ err.textContent='꿈 내용을 먼저 적어 주세요. (꿈해몽하기 메뉴에서 적을 수 있어요)'; err.classList.add('show'); return; }
-    if(isLink && !state){ err.textContent='먼저 첫 화면에서 사주를 계산해 주세요. 사주를 계산한 뒤에 내 사주로 꿈을 풀이할 수 있어요.'; err.classList.add('show'); return; }
-    dreamDraft=text;
-    const forKey=isLink?'linkFor':'aiFor';
-    if(!force && dreamOut[kind] && dreamOut[forKey]===text) return; // 같은 꿈이면 이미 나온 풀이를 그대로 보여준다
-    dreamSyms=findDreamSymbols(text);
-    let stop=loading.querySelector('.ai-stop');
-    const ctl=new AbortController(); dreamCtl[kind]=ctl;
-    if(!stop){ stop=document.createElement('button'); stop.type='button'; stop.className='ai-stop'; stop.textContent='중지'; loading.appendChild(stop); }
-    stop.onclick=()=>ctl.abort();
-    const local = isLink ? dreamLocalLink() : '';
-    box.classList.remove('show'); box.textContent=''; hideShareBar(box);
-    if(isLink && local){ box.textContent=local; box.classList.add('show'); }
-    loading.classList.add('show');
-    try{
-      let prompt;
-      if(isLink){
-        const {s,dayStemIdx,isMale:im,counts,strength,ys,year,month,day}=state;
-        const summary=buildSajuSummary(s,dayStemIdx,im,counts,strength,ys,year,month,day);
-        prompt=`다음은 한 사람의 사주 정보입니다.\n\n${summary}\n\n[이 사람이 꾼 꿈]\n${text}\n\n[전통 해몽 사전에서 찾은 상징]\n${dreamSymLines()}\n\n이 사람의 사주와 꿈을 연결해서 풀이해줘. 위 [오늘 날짜]를 기준으로 '올해', '이번 달' 같은 시점을 해석해줘. [풀이 규칙] 1) 첫 문장에서 이 꿈이 이 사람의 사주 흐름에서 어떤 의미인지(좋은 쪽인지, 조심할 쪽인지, 마음이 반영된 꿈인지) 분명하게 먼저 말해줘. 2) 꿈의 상징을 오행으로 바꿔서(물=수, 불=화, 나무·꽃=목, 흙·집=토, 쇠·돈·칼=금 등), 이 사람 원국에서 부족하거나 넘치는 오행과 어떻게 대응하는지 풀어줘. 3) 꿈에 나온 재물·직장·사람·일과 관련된 십신(재성·관성·식상·인성·비겁)이 이 사람 원국에서 어떤 위치인지 짚어서 해석해줘. 4) 올해 세운과 이번 달 흐름이 꿈의 내용과 어떻게 맞닿는지 말해줘. 5) 꿈에 동물이 나오거나 사람이 나오면 이 사람의 띠와 지지의 합·충 관계를 살펴 의미를 더해줘. 관련 없는 항목은 억지로 끼워 넣지 말고 해당되는 것만 풀어줘. 6) 원국의 간지와 오행 개수를 처음부터 다시 나열하지 말고, 꿈과 직접 관련된 글자와 근거만 이야기 흐름 속에서 짧게 언급해줘. 7) 꿈이 반드시 일어날 일을 예언하는 것처럼 단정하지 말고 겁주는 말도 쓰지 마. 해석이라는 점이 드러나게 써줘. 8) 말투는 정중한 합쇼체, 분량은 3~4문단으로 해줘. 마크다운(굵은 글씨, 제목, 목록)은 쓰지 마.`;
-      } else prompt=buildDreamPrompt();
-      const answer=stripMdMarks(await callClaude(prompt, undefined, ctl.signal, !isLink)); // 순수 꿈풀이에는 사주풀이용 공통 답변 지침을 붙이지 않는다
-      if(!answer) throw new Error('빈 응답을 받았습니다.');
-      const full=(local?local+'\n\n':'')+answer;
-      dreamOut[kind]=full; dreamOut[forKey]=text;
-      box.textContent=full; box.classList.add('show'); showShareBar(box); dreamIntroUpdate();
-    } catch(e){
-      if(e && e.name==='AbortError') err.textContent='AI 풀이 만들기를 중지했습니다. "다시 풀이하기"를 누르면 새로 만들어요.';
-      else err.innerHTML='AI 풀이를 불러오지 못했습니다 ('+escapeHtml(e.message)+').<br>"다시 풀이하기"를 눌러 재시도해주세요.';
-      err.classList.add('show');
-      if(local && box.textContent){ showShareBar(box); }
-    } finally {
-      dreamCtl[kind]=null; loading.classList.remove('show');
-    }
   }
   document.getElementById('btnDream').addEventListener('click', ()=>openModal('dream'));
 
