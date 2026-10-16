@@ -2153,9 +2153,9 @@ window.__pip = (function(){
     add('div','ps-meta','인쇄일 '+new Date().toLocaleDateString('ko-KR',{year:'numeric',month:'long',day:'numeric'}));
     cell.appendChild(doc.createElement('hr'));
     if(item){
-      const q=item.firstElementChild, ans=item.querySelector('.ai-box');
+      const q=item.firstElementChild, ans=item.querySelector('.ai-box'); const qtxt=q?(q.dataset&&q.dataset.q||q.textContent.trim()):'';
       const wrap=doc.createElement('div'); wrap.className='ps-qa'; cell.appendChild(wrap);
-      const qe=doc.createElement('div'); qe.className='ps-q'; qe.textContent=q?q.textContent.trim():''; wrap.appendChild(qe);
+      const qe=doc.createElement('div'); qe.className='ps-q'; qe.textContent=qtxt; wrap.appendChild(qe);
       const ae=doc.createElement('div'); ae.className='ps-body'; ae.textContent=ans?ans.textContent.trim():''; wrap.appendChild(ae);
     } else {
       const box=bar ? bar.previousElementSibling : null;
@@ -2176,8 +2176,8 @@ window.__pip = (function(){
     if(b.dataset.share==='print'){ printFrom(b, item, bar); return; }
     let text='';
     if(item){
-      const q=item.firstElementChild, ans=item.querySelector('.ai-box');
-      text=(q?q.textContent.trim():'')+'\n\n'+(ans?ans.textContent.trim():'');
+      const q=item.firstElementChild, ans=item.querySelector('.ai-box'); const qtxt=q?(q.dataset&&q.dataset.q||q.textContent.trim()):'';
+      text=qtxt+'\n\n'+(ans?ans.textContent.trim():'');
     } else {
       const box=bar ? bar.previousElementSibling : null; text=box ? box.textContent.trim() : '';
     }
@@ -5224,7 +5224,7 @@ window.__pip = (function(){
     });
     wireAutoGrow(ta); setTimeout(()=>autoGrow(ta),60);
     attachVoiceInput('dreamInput','micDreamInput','micErrDreamInput');
-    panel.querySelectorAll('[data-dv]').forEach(b=>b.addEventListener('click', ()=>showDreamMode(b.dataset.dv)));
+    panel.querySelectorAll('[data-dv]').forEach(b=>b.addEventListener('click', ()=>dreamModeClick(b.dataset.dv)));
     showDreamMode(dreamMode);
     renderDreamHist();
     // 이전 대화가 있으면 창을 열자마자 가장 최근 대화 쪽(아래)으로 이동
@@ -5239,41 +5239,66 @@ window.__pip = (function(){
   function renderDreamHist(){
     const box=document.getElementById('dreamHistoryBox'); if(!box) return;
     box.innerHTML = dreamHist.map(item=>{
-      let ans='';
-      if(item.a!=null) ans=`<div class="ai-box show" style="margin-top:0;">${escapeHtml(item.a)}</div><div class="share-bar" style="display:flex;">${buildShareBarHTML()}</div>`;
-      else if(!item.err) ans=`<div class="ai-box show" style="margin-top:0; color:var(--ink-soft);">AI가 ${item.mode==='link'?'내 사주와 꿈을 함께 ':'꿈 이야기를 '}풀이하고 있어요…<button type="button" class="ai-stop" data-ai-stop="dream">중지</button></div>`;
-      if(item.err) ans+=`<div class="ai-box show" style="margin-top:${item.a!=null?'6px':'0'}; color:var(--seal);">⚠️ ${escapeHtml(item.err)}</div>`;
       const kw = (item.syms && item.syms.length) ? '<span style="font-size:12px;color:var(--ink-soft);margin:0 6px 0 4px;">찾은 상징</span>'+item.syms.map(x=>`<span class="stage-tag" style="font-size:12px;margin:0 4px 4px 0;padding:2px 9px;">${escapeHtml(x.name)}</span>`).join('') : '';
-      return `
-      <div class="qna-item">
-        <div style="font-size:13px;font-weight:700;color:var(--ink);margin-bottom:6px;">Q. ${escapeHtml(item.q)}</div>
-        <div style="margin-bottom:6px;"><span style="font-size:11.5px;color:var(--ink-soft);">${DREAM_MODE_LABEL[item.mode]||''}</span>${kw}</div>
-        ${ans}
-      </div>`;
+      return item.order.map((mode,i)=>{
+        const r=item.res[mode];
+        let ans='';
+        if(r.a!=null) ans=`<div class="ai-box show" style="margin-top:0;">${escapeHtml(r.a)}</div><div class="share-bar" style="display:flex;">${buildShareBarHTML()}</div>`;
+        else if(!r.err) ans=`<div class="ai-box show" style="margin-top:0; color:var(--ink-soft);">AI가 ${mode==='link'?'내 사주와 꿈을 함께 ':'꿈 이야기를 '}풀이하고 있어요…<button type="button" class="ai-stop" data-ai-stop="dream">중지</button></div>`;
+        if(r.err) ans+=`<div class="ai-box show" style="margin-top:${r.a!=null?'6px':'0'}; color:var(--seal);">⚠️ ${escapeHtml(r.err)}</div>`;
+        const head = i===0
+          ? `<div data-q="Q. ${escapeHtml(item.q)}" style="font-size:13px;font-weight:700;color:var(--ink);margin-bottom:6px;">Q. ${escapeHtml(item.q)}</div><div style="margin-bottom:6px;"><span style="font-size:11.5px;color:var(--ink-soft);">${DREAM_MODE_LABEL[mode]||''}</span>${kw}</div>`
+          : `<div data-q="Q. ${escapeHtml(item.q)}" style="font-size:12px;color:var(--ink-soft);margin:0 0 6px;">↳ ${DREAM_MODE_LABEL[mode]||''}</div>`;
+        return `<div class="qna-item" data-dq="${dreamHist.indexOf(item)}" data-dm="${mode}" style="${i>0?'margin-top:-6px;':''}">${head}${ans}</div>`;
+      }).join('');
     }).join('');
     dreamIntroUpdate();
+  }
+  function dreamScrollTo(item,mode){
+    const el=document.querySelector(`#dreamHistoryBox .qna-item[data-dq="${dreamHist.indexOf(item)}"][data-dm="${mode}"]`);
+    if(el) el.scrollIntoView({behavior:'smooth', block:'start'});
+  }
+  // 위쪽 방식 버튼: 입력칸에 새 글이 있으면 새 질문으로, 없으면 가장 최근 질문을 그 방식으로 바로 풀이
+  function dreamModeClick(v){
+    showDreamMode(v);
+    const input=document.getElementById('dreamInput'), errEl=document.getElementById('dreamError');
+    if(errEl){ errEl.classList.remove('show'); errEl.textContent=''; }
+    if(dreamBusy) return;
+    if(input && input.value.trim()){ askDream(); return; }
+    const last=dreamHist[dreamHist.length-1];
+    if(!last){ if(errEl){ errEl.textContent='꿈 내용을 먼저 적어 주세요.'; errEl.classList.add('show'); } return; }
+    runDream(last, v);
   }
   async function askDream(){
     if(dreamBusy) return;
     const input=document.getElementById('dreamInput'); if(!input) return;
     const q=input.value.trim(); if(!q) return;
     stopMicIfRecording('micDreamInput');
-    const mode=dreamMode, errEl=document.getElementById('dreamError');
+    const errEl=document.getElementById('dreamError');
     errEl.classList.remove('show'); errEl.textContent='';
-    if(mode==='link' && !state){ errEl.textContent='먼저 첫 화면에서 사주를 계산해 주세요. 사주를 계산한 뒤에 내 사주로 꿈을 풀이할 수 있어요.'; errEl.classList.add('show'); return; }
-    const syms=findDreamSymbols(q); dreamSyms=syms;
-    const item={q, mode, a:null, err:null, syms};
-    const past=dreamHist.filter(it=>it.a!=null).slice(-10).map((it,i)=>`Q${i+1}. ${it.q}\nA${i+1}. ${it.a}`).join('\n\n');
-    const hist=past ? `\n\n[지금까지 나눈 대화]\n${past}\n\n위 대화를 기억하고 이어서 답해줘. 이미 설명한 내용은 반복하지 마.\n\n` : '';
-    // 엔터를 치는 즉시 질문을 창에 올리고 입력칸을 비운다 (풀이는 나중에 채워진다)
+    if(dreamMode==='link' && !state){ errEl.textContent='먼저 첫 화면에서 사주를 계산해 주세요. 사주를 계산한 뒤에 내 사주로 꿈을 풀이할 수 있어요.'; errEl.classList.add('show'); return; }
+    const item={q, syms:findDreamSymbols(q), res:{}, order:[]};
     dreamHist.push(item); input.value=''; dreamDraft=''; autoGrow(input);
+    await runDream(item, dreamMode, true);
+  }
+  async function runDream(item, mode, restoreOnFail){
+    if(dreamBusy) return;
+    const errEl=document.getElementById('dreamError');
+    const prev=item.res[mode];
+    if(prev && !prev.err){ dreamScrollTo(item,mode); return; }   // 이미 풀이가 있으면 다시 만들지 않고 그 풀이로 이동
+    if(mode==='link' && !state){ if(errEl){ errEl.textContent='먼저 첫 화면에서 사주를 계산해 주세요. 사주를 계산한 뒤에 내 사주로 꿈을 풀이할 수 있어요.'; errEl.classList.add('show'); } return; }
+    const q=item.q, syms=item.syms; dreamSyms=syms;
+    const r={a:null, err:null}; item.res[mode]=r;
+    if(!item.order.includes(mode)) item.order.push(mode);
+    const past=dreamHist.filter(it=>it!==item).map(it=>{ const k=it.order.find(m=>it.res[m].a!=null && m!=='dict') || it.order.find(m=>it.res[m].a!=null); return k?{q:it.q,a:it.res[k].a}:null; }).filter(Boolean).slice(-10).map((it,i)=>`Q${i+1}. ${it.q}\nA${i+1}. ${it.a}`).join('\n\n');
+    const hist=past ? `\n\n[지금까지 나눈 대화]\n${past}\n\n위 대화를 기억하고 이어서 답해줘. 이미 설명한 내용은 반복하지 마.\n\n` : '';
     if(mode==='dict'){
-      item.a = syms.length ? syms.map(x=>`■ ${x.name}\n${x.desc}`).join('\n\n') : '사전에서 딱 맞는 상징을 찾지 못했어요. 위 메뉴에서 "✨ AI 심층 풀이"를 고른 뒤 다시 보내면 꿈 이야기 전체를 보고 풀이해 드려요.';
-      renderDreamHist(); scrollToLastQna('dreamHistoryBox'); return;
+      r.a = syms.length ? syms.map(x=>`■ ${x.name}\n${x.desc}`).join('\n\n') : '사전에서 딱 맞는 상징을 찾지 못했어요. 위 메뉴에서 "✨ AI 심층 풀이"를 누르면 꿈 이야기 전체를 보고 풀이해 드려요.';
+      renderDreamHist(); dreamScrollTo(item,mode); return;
     }
     dreamBusy=true;
     const ctl=new AbortController(); aiCtls.dream=ctl;
-    renderDreamHist(); scrollToLastQna('dreamHistoryBox');
+    renderDreamHist(); dreamScrollTo(item,mode);
     const isLink=(mode==='link');
     const local = isLink ? dreamLocalLink() : '';
     const text=q;
@@ -5286,16 +5311,13 @@ window.__pip = (function(){
       } else prompt=buildDreamPrompt(text, hist);
       const answer=stripMdMarks(await callClaude(prompt, undefined, ctl.signal, !isLink)); // 순수 꿈풀이에는 사주풀이용 공통 답변 지침을 붙이지 않는다
       if(!answer) throw new Error('빈 응답을 받았습니다.');
-      item.a=(local?local+'\n\n':'')+answer;
+      r.a=(local?local+'\n\n':'')+answer;
     } catch(e){
-      item.err = (e && e.name==='AbortError') ? '풀이 만들기를 중지했습니다. 같은 꿈을 다시 보내 주세요.' : '풀이를 불러오지 못했습니다 ('+e.message+'). 같은 꿈을 다시 보내 주세요.';
-      if(local) item.a=local;
-      // 방금 보낸 글을 입력칸에 되돌려 놓아서, 다시 쓰지 않고 엔터만 치면 되게 한다
-      const inp=document.getElementById('dreamInput');
-      if(inp && !inp.value){ inp.value=q; dreamDraft=q; autoGrow(inp); }
+      r.err = (e && e.name==='AbortError') ? '풀이 만들기를 중지했습니다. 같은 방식 버튼을 다시 눌러 주세요.' : '풀이를 불러오지 못했습니다 ('+e.message+'). 같은 방식 버튼을 다시 눌러 주세요.';
+      if(local) r.a=local;
     } finally {
       dreamBusy=false; aiCtls.dream=null;
-      renderDreamHist(); scrollToLastQna('dreamHistoryBox');
+      renderDreamHist(); dreamScrollTo(item,mode);
     }
   }
   function dreamSymLines(){
