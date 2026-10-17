@@ -3619,7 +3619,7 @@ window.__pip = (function(){
     updateCtxBtn();
   })();
 
-  // ---- 마우스 설명 상자 (14pt). 컴퓨터는 올리면, 폰·태블릿은 누르면 뜬다 ----
+  // ---- 마우스 설명 상자 (12pt). 컴퓨터는 올리면, 폰·태블릿은 누르면 뜬다 ----
   function installTip(doc){
     if(doc.__tipInstalled) return; doc.__tipInstalled=true;
     const win=doc.defaultView||window;
@@ -3628,7 +3628,7 @@ window.__pip = (function(){
     const ensure=()=>{
       if(tip && tip.isConnected) return tip;
       tip=doc.createElement('div'); tip.className='ui-tip';
-      tip.style.cssText='position:fixed;z-index:100000;display:none;max-width:min(360px,calc(100vw - 16px));padding:10px 13px;border-radius:8px;background:#2d2a4a;color:#fff;font-size:14pt;line-height:1.55;white-space:pre-line;pointer-events:none;box-shadow:0 6px 20px rgba(0,0,0,.28);text-align:left;font-weight:400;';
+      tip.style.cssText='position:fixed;z-index:100000;display:none;max-width:min(360px,calc(100vw - 16px));padding:10px 13px;border-radius:8px;background:#2d2a4a;color:#fff;font-size:12pt;line-height:1.55;white-space:pre-line;pointer-events:none;box-shadow:0 6px 20px rgba(0,0,0,.28);text-align:left;font-weight:400;';
       doc.body.appendChild(tip); return tip;
     };
     const place=(x,y)=>{
